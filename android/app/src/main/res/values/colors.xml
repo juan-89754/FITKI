@@ -1,10 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0C6E4E</color>
     <!--
-      Color del splash. En claro usa el verde de marca (el mismo del icono) y
-      en oscuro el #121212 de la app, para que la transicion a la primera
-      pantalla no se vea como un salto de blanco.
+      Fondo del icono adaptativo. Tiene que ser exactamente el fondo del logo
+      (assets/icon/icon.png), porque el recorte del primer plano deja este
+      color a la vista alrededor. Lo mantiene tool\generate_launcher_icons.ps1.
+    -->
+    <color name="ic_launcher_background">#0F6A47</color>
+    <!--
+      Color del splash. En claro usa el verde de la app (AppColors.primary) y
+      en oscuro el #121212, para que la transicion a la primera pantalla no se
+      vea como un salto de blanco.
     -->
     <color name="fitki_splash">#0C6E4E</color>
+    <!--
+      Colores base del widget de registro rápido. Solo son el punto de partida:
+      el fondo de verdad lo elige QuickLogAcentos según el acento de Apariencia,
+      y estos valores son los del acento por defecto (el verde de marca) para
+      que la vista previa del layout no se vea sin pintar.
+
+      El texto va en blanco porque es el único color que contrasta con los
+      siete acentos; test\acentos_test.dart vigila esa condición.
+    -->
+    <color name="quick_log_fondo">#0C6E4E</color>
+    <color name="quick_log_titulo">#B9E8D2</color>
+    <color name="quick_log_texto">#FFFFFF</color>
+    <color name="quick_log_boton">#FFFFFF</color>
+    <color name="quick_log_boton_texto">#0C6E4E</color>
 </resources>

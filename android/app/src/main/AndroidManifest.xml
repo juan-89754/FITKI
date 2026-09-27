@@ -1,8 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Biometría (huella/Face Unlock) para desbloquear Fitki con PIN -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <!-- Necesaria para el lector de huella en Android 7.0 (API 24)-8.1 (API 27) -->
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <!-- Cámara para image_picker -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Almacenamiento para image_picker (Android ≤ 12) -->
@@ -19,9 +15,9 @@
         android:dataExtractionRules="@xml/data_extraction_rules">
         <!-- allowBackup="false" + estas reglas: el Auto Backup de Android queda
              prohibido. Sin esto, el sistema sube la base de datos con todos los
-             movimientos y saldos al Drive del usuario, saltándose el bloqueo
-             por PIN de la app. El usuario que quiere una copia la genera él
-             desde Configuración, que valida el esquema antes de compartirla. -->
+             movimientos y saldos al Drive del usuario. El usuario que quiere una
+             copia la genera él desde Configuración, que valida el esquema antes
+             de compartirla. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

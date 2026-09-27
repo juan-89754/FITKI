@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../data/preferences/app_preferences.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_logo.dart';
 import '../widgets/perfil_avatar.dart';
 
 /// Pantalla central de Configuraciones: une el perfil, las preferencias
-/// (apariencia, seguridad, notificaciones y umbral de alerta de deuda) y el
-/// acceso a categorías, backup/restauración y "Acerca de".
+/// (apariencia, notificaciones y umbral de alerta de deuda) y el acceso a
+/// categorías, backup/restauración y "Acerca de".
 class ConfiguracionesScreen extends ConsumerStatefulWidget {
   const ConfiguracionesScreen({super.key});
 
@@ -104,16 +105,24 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          icon: Icon(
-            Icons.savings_rounded,
-            color: AppColors.primary,
-            size: 40,
-          ),
-          title: const Text('Fitki'),
-          content: const Text(
-            'Finanzas personales sin complicaciones.\n\n'
-            'Versión $_versionApp',
-            textAlign: TextAlign.center,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppLogo(size: 88),
+              const SizedBox(height: 12),
+              Text(
+                'Fitki',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Finanzas personales sin complicaciones.\n\n'
+                'Versión $_versionApp',
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -143,7 +152,7 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
           _TarjetaPerfil(
             nombre: perfil?.nombre ?? '',
             fotoPath: perfil?.fotoPath,
-            onTap: () => context.push('perfil'),
+            onTap: () => context.push('/configuraciones/perfil'),
           ),
           const SizedBox(height: 28),
           const _TituloSeccion('Preferencias'),
@@ -164,23 +173,10 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
                   colorFrente: AppColors.orange,
                   titulo: 'Apariencia',
                   subtitulo: 'Tema claro, oscuro y colores de la app',
-                  onTap: () => context.push('apariencia'),
-                ),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  indent: 64,
-                  color: AppColors.borderSubtle,
-                ),
-                _FilaOpcion(
-                  icono: Icons.lock_outline_rounded,
-                  colorIcono: AppColors.chipBackgroundCoral,
-                  colorFrente: AppColors.coral,
-                  titulo: 'Seguridad',
-                  subtitulo: 'PIN y bloqueo de la app',
-                  onTap: () => context.push('seguridad'),
+                  onTap: () => context.push('/configuraciones/apariencia'),
                 ),
                 // TODO: reactivar cuando se implemente el motor de
+
                 // notificaciones (sección 18.9 del módulo de Configuraciones).
                 // Se oculta temporalmente el switch: la preferencia se sigue
                 // persistiendo en AppPreferences.notificacionesHabilitadas.
@@ -291,7 +287,7 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
             ),
             child: _FilaOpcion(
               icono: Icons.category_outlined,
-              colorIcono: AppColors.chipBackgroundGreen,
+              colorIcono: AppColors.chipBackgroundPrimary,
               colorFrente: AppColors.primary,
               titulo: 'Categorías personalizadas',
               subtitulo: 'Gestiona tus categorías de gasto e ingreso',
@@ -315,7 +311,7 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
               colorFrente: AppColors.oliveGreen,
               titulo: 'Backup y restauración',
               subtitulo: 'Copia, restaura o borra todos tus datos',
-              onTap: () => context.push('backup'),
+              onTap: () => context.push('/configuraciones/backup'),
             ),
           ),
           const SizedBox(height: 28),
@@ -448,7 +444,7 @@ class _TarjetaPerfil extends StatelessWidget {
                 nombre: nombre,
                 fotoPath: fotoPath,
                 size: 56,
-                fondo: AppColors.chipBackgroundGreen,
+                fondo: AppColors.chipBackgroundPrimary,
                 colorTexto: AppColors.primary,
               ),
               const SizedBox(width: 14),

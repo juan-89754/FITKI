@@ -1,11 +1,11 @@
 {
-    "name": "fitki",
-    "short_name": "fitki",
+    "name": "Fitki",
+    "short_name": "Fitki",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0C6E4E",
+    "theme_color": "#0C6E4E",
+    "description": "Finanzas personales sin complicaciones.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

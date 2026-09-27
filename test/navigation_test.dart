@@ -9,6 +9,8 @@ import 'package:fitki/data/models/debt.dart';
 import 'package:fitki/data/models/financial_goal.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/data/providers/shared_providers.dart';
+import 'package:fitki/data/models/perfil.dart';
+import 'package:fitki/data/repositories/perfil_repository.dart';
 import 'package:fitki/shared/widgets/app_bottom_nav.dart';
 import 'package:fitki/shared/widgets/app_drawer.dart';
 import 'package:fitki/ui/deudas/deudas_providers.dart';
@@ -22,6 +24,40 @@ import 'package:fitki/ui/movimientos/movimientos_providers.dart';
 /// cualquier pestaña, y los destinos se alcanzaban con verbos mezclados
 /// (`goBranch`, `go` y `push` sobre raíces de rama) que rompían la linealidad.
 Finder get barra => find.byType(AppBottomNav);
+
+/// PerfilRepository sin base de datos.
+///
+/// Las pantallas que leen en `initState` (como Perfil) llegan a sqflite, que
+/// no está inicializado en `flutter test`. Este fake deja montar esas
+/// pantallas para comprobar la navegación sin meter una base de datos real en
+/// los tests de UI.
+class _PerfilRepositoryFake extends PerfilRepository {
+  Perfil? guardado;
+
+  @override
+  Future<Perfil?> obtenerUno() async => guardado;
+
+  @override
+  Future<List<Perfil>> getAll() async => [if (guardado != null) guardado!];
+
+  @override
+  Future<int> insert(Perfil perfil) async {
+    guardado = perfil;
+    return perfil.id ?? 1;
+  }
+
+  @override
+  Future<int> update(Perfil perfil) async {
+    guardado = perfil;
+    return 1;
+  }
+
+  @override
+  Future<int> delete(int id) async {
+    guardado = null;
+    return 1;
+  }
+}
 
 void main() {
   late GoRouter router;
@@ -40,6 +76,10 @@ void main() {
           metasStreamProvider.overrideWith((ref) => Stream.value(const <FinancialGoal>[])),
           deudasStreamProvider.overrideWith((ref) => Stream.value(const <Debt>[])),
           perfilStreamProvider.overrideWith((ref) => Stream.value(null)),
+          perfilRepositoryProvider.overrideWithValue(_PerfilRepositoryFake()),
+          // El puente de registro rápido escucha las categorías del usuario
+          // para armar los chips de la notificación, así que entra en el
+          // grafo de la app igual que los streams de arriba.
         ],
         child: FitkiApp(router: router),
       ),
@@ -184,4 +224,58 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  // Las pantallas de Configuración son hijas de '/configuraciones'. Con rutas
+  // relativas ('apariencia', 'backup'...) go_router las resolvía contra la
+  // raíz y tiraba GoException: no routes for location, porque la subruta real
+  // es '/configuraciones/apariencia'.
+  const destinosConfiguracion = {
+    // Etiqueta visible -> ruta esperada
+    'Apariencia': '/configuraciones/apariencia',
+    'Backup y restauración': '/configuraciones/backup',
+    'Tu perfil': '/configuraciones/perfil',
+  };
+
+
+  for (final destino in destinosConfiguracion.entries) {
+    testWidgets('Configuración abre "${destino.key}" en ${destino.value}', (
+      tester,
+    ) async {
+      // La lista de Configuración es larga y el ListView solo construye lo que
+      // entra en pantalla. Con la superficie por defecto (800x600) las últimas
+      // tarjetas ni siquiera existen en el árbol y no se pueden tocar.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpApp(tester);
+
+      router.go('/configuraciones');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final etiqueta = find.text(destino.key);
+      expect(etiqueta, findsOneWidget, reason: 'falta el destino visible');
+
+      await tester.tap(etiqueta);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        router.state.uri.path,
+        destino.value,
+        reason: 'tocar "${destino.key}" debe abrir ${destino.value}',
+      );
+
+      // Y atrás devuelve a la lista, no a la raíz.
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(router.state.uri.path, '/configuraciones');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 }

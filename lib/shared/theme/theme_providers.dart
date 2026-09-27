@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/preferences/app_preferences.dart';
+import 'app_colors.dart';
 
 class ThemeModeNotifier extends AsyncNotifier<ThemeMode> {
   @override
@@ -25,31 +26,32 @@ class ThemeModeNotifier extends AsyncNotifier<ThemeMode> {
   }
 }
 
-class TemaRojoNotifier extends AsyncNotifier<bool> {
+class ColorPrincipalNotifier extends AsyncNotifier<AcentoMarca> {
   @override
-  Future<bool> build() async {
+  Future<AcentoMarca> build() async {
     try {
-      return await AppPreferences.getTemaRojo();
+      return AppColors.acentoPorNombre(await AppPreferences.getColorPrincipal());
     } catch (_) {
-      // En entornos sin preferencias accesibles (p. ej. pruebas) no se usa
-      // el acento rojo.
-      return false;
+      // En entornos sin preferencias accesibles (p. ej. pruebas) se queda el
+      // verde clásico.
+      return AppColors.acentoPorDefecto;
     }
   }
 
-  Future<void> cambiar(bool activo) async {
-    state = AsyncValue.data(activo);
+  Future<void> cambiar(AcentoMarca acento) async {
+    state = AsyncValue.data(acento);
     try {
-      await AppPreferences.setTemaRojo(activo);
+      await AppPreferences.setColorPrincipal(acento.nombre);
     } catch (_) {
       // No se bloquea el cambio si la persistencia falla.
     }
   }
 }
 
-final temaRojoProvider = AsyncNotifierProvider<TemaRojoNotifier, bool>(
-  TemaRojoNotifier.new,
-);
+final colorPrincipalProvider =
+    AsyncNotifierProvider<ColorPrincipalNotifier, AcentoMarca>(
+      ColorPrincipalNotifier.new,
+    );
 
 final themeModeProvider =
     AsyncNotifierProvider<ThemeModeNotifier, ThemeMode>(

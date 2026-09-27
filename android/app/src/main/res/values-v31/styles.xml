@@ -2,14 +2,17 @@
 <resources>
     <!--
       Android 12+ usa su propia API de splash, asi que el launch_background se
-      ignora y hay que declarar los atributos equivalents. El icono de sistema
-      se recorta en circulo, por eso se usa la F sobre el verde de marca.
+      ignora y hay que declarar los atributos equivalentes. El sistema recorta el
+      icono en circulo, por eso se usa el foreground adaptativo (mipmap), que ya
+      viene ampliado a la zona segura del 66%. Antes esto apuntaba a un vector
+      dibujado a mano con una F.
     -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:windowSplashScreenBackground">@color/fitki_splash</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
     </style>
+
 
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>

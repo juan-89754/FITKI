@@ -28,8 +28,6 @@
 	<string>Fitki usa la cámara para tomar tu foto de perfil.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Fitki accede a tus fotos para elegir tu foto de perfil.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Fitki usa Face ID para desbloquear la app con tu rostro.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

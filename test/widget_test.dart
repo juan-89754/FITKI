@@ -48,7 +48,66 @@ void main() {
       );
       expect(find.text('PATRIMONIO TOTAL'), findsOneWidget);
 
+      // Fitki no tiene pantalla de bloqueo: la app entra directa al inicio, sin
+      // pedir PIN ni biometría ni al arrancar ni al volver de segundo plano.
+      expect(find.textContaining('PIN'), findsNothing);
+      expect(find.textContaining('Ingresa tu PIN'), findsNothing);
+      expect(find.textContaining('información está protegida'), findsNothing);
+      expect(find.byIcon(Icons.fingerprint), findsNothing);
+
       // Desmonta el árbol para cerrar cualquier recurso pendiente.
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'volver de segundo plano no monta ninguna pantalla de desbloqueo',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activosStreamProvider.overrideWith(
+              (ref) => Stream.value(const <Asset>[]),
+            ),
+            movimientosStreamProvider.overrideWith(
+              (ref) => Stream.value(const <Transaction>[]),
+            ),
+            metasStreamProvider.overrideWith(
+              (ref) => Stream.value(const <FinancialGoal>[]),
+            ),
+            deudasStreamProvider.overrideWith(
+              (ref) => Stream.value(const <Debt>[]),
+            ),
+            perfilStreamProvider.overrideWith((ref) => Stream.value(null)),
+          ],
+          child: const FitkiApp(),
+        ),
+      );
+      await tester.pump();
+
+      // Simula la ida y vuelta a segundo plano. Antes, AppGate escuchaba este
+      // ciclo de vida y volaba a la pantalla de bloqueo. La cadena completa
+      // respeta las transiciones que valida el binding:
+      // resumed -> inactive -> hidden -> paused -> hidden -> inactive -> resumed.
+      for (final estado in const [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(estado);
+        await tester.pump();
+      }
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('Este es el panorama de tus finanzas.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('PIN'), findsNothing);
+
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

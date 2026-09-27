@@ -219,7 +219,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                       nombre: _nombreController.text,
                       fotoPath: _fotoPath,
                       size: 110,
-                      fondo: AppColors.chipBackgroundGreen,
+                      fondo: AppColors.chipBackgroundPrimary,
                       colorTexto: AppColors.primary,
                     ),
                     const SizedBox(height: 16),

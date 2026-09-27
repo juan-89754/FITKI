@@ -221,7 +221,7 @@ class _CategoriaCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: esGasto
                               ? AppColors.chipBackgroundCoral
-                              : AppColors.chipBackgroundGreen,
+                              : AppColors.chipBackgroundPrimary,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(

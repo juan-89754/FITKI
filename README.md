@@ -14,16 +14,16 @@ Módulos terminados y operativos:
 
 | Módulo | Estado |
 | --- | --- |
-| Activos | ✅ Completo |
-| Ingresos y gastos | ✅ Completo |
-| Metas financieras | ✅ Completo |
-| Deudas | ✅ Completo |
-| Préstamos e inversiones | ✅ Completo |
-| Cotizaciones y proyectos | ✅ Completo |
-| Presupuesto y gastos diarios | ✅ Completo |
-| Estadísticas | ✅ Completo |
-| Perfil, apariencia, seguridad, categorías personalizadas y backup | ✅ Completo |
-| Asistente financiero con IA | 🚧 No iniciado |
+| Activos | Completo |
+| Ingresos y gastos | Completo |
+| Metas financieras | Completo |
+| Deudas | Completo |
+| Préstamos e inversiones | Completo |
+| Cotizaciones y proyectos | Completo |
+| Presupuesto y gastos diarios | Completo |
+| Estadísticas | Completo |
+| Perfil, apariencia, categorías personalizadas y backup | Completo |
+| Asistente financiero con IA | No iniciado |
 
 ## Objetivo general
 
@@ -116,14 +116,10 @@ Panel con gráficos (`fl_chart`) que se recalcula solo ante cualquier cambio en 
 Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de la app y la anterior se elimina al cambiarla.
 
 **Apariencia**
-Temas *Sistema*, *Claro* y *Rojo* (acento rojo en lugar del verde clásico). La preferencia se guarda y se aplica de inmediato.
-
-**Seguridad**
-- PIN de 4 a 6 dígitos, con paso de confirmación.
-- El PIN se guarda como hash SHA-256 en `flutter_secure_storage` (Keychain en iOS/macOS, Android Keystore en Android), nunca en texto plano.
-- Desbloqueo biométrico (huella o Face ID) cuando el dispositivo lo soporta.
-- La app se bloquea al arrancar y cada vez que vuelve de segundo plano, sin perder la pantalla en la que estaba el usuario.
-- Para desactivar el PIN se exige introducir el PIN actual. **No hay recuperación de PIN olvidado**: habría que reinstalar la app, lo que implica perder los datos locales.
+- Tema *Sistema*, *Claro* u *Oscuro*, independiente del color de marca.
+- Siete colores de marca: *Verde* (predeterminado), *Azul*, *Turquesa*, *Ámbar*, *Rojo*, *Rosa* y *Púrpura*. Se aplican a la barra superior, los botones, los iconos y el bloque de saludo del inicio.
+- Todos los tonos están elegidos para que el texto blanco se lea encima (contraste WCAG AA o superior, verificado en `test/acentos_test.dart`): no hay colores claros ni saturados que lo impidan.
+- Ambas preferencias se guardan y se aplican de inmediato. La antigua opción de acento rojo se migra sola al *Rojo* de la paleta nueva.
 
 **Categorías personalizadas**
 - Se pueden crear categorías de gasto o ingreso con nombre e ícono.
@@ -133,7 +129,7 @@ Temas *Sistema*, *Claro* y *Rojo* (acento rojo en lugar del verde clásico). La 
 **Backup y restauración**
 - **Generar backup:** copia el archivo `.db` completo y lo comparte mediante el diálogo nativo del sistema, sin pedir permisos de almacenamiento. Se muestra la fecha del último backup.
 - **Restaurar:** se elige un archivo `.db`; antes de tocar la base real se valida que contenga todas las tablas de Fitki. Si el reemplazo falla a mitad de camino, la base original se revierte automáticamente y se informa que los datos se mantuvieron a salvo.
-- **Borrar todos los datos:** requiere dos confirmaciones, la segunda escribiendo un texto. Conserva las preferencias (tema, PIN, biometría y umbral).
+- **Borrar todos los datos:** requiere dos confirmaciones, la segunda escribiendo un texto. Conserva las preferencias (tema y umbral).
 
 ## Stack técnica
 
@@ -143,11 +139,8 @@ Temas *Sistema*, *Claro* y *Rojo* (acento rojo en lugar del verde clásico). La 
 - **sqflite** como base de datos local (14 tablas, versión de esquema 8)
 - **fl_chart** para los gráficos
 - **shared_preferences** para preferencias no sensibles
-- **flutter_secure_storage** para el hash del PIN
-- **local_auth** para la biometría
 - **image_picker** + **path_provider** para la foto de perfil
 - **file_picker** + **share_plus** para backup y restauración
-- **crypto** para el hash del PIN
 - **intl** con localización `es` (fechas y moneda en español)
 - **flutter_lints** para el análisis estático
 
@@ -164,13 +157,13 @@ lib/
 │   ├── db/db_helper.dart      # Conexión SQLite, creación y migraciones
 │   ├── models/                # Modelos con su definición SQL
 │   ├── repositories/          # Acceso a datos por entidad
-│   ├── preferences/           # Preferencias y almacenamiento seguro
+│   ├── preferences/           # Preferencias de la app
 │   └── providers/             # Providers compartidos
 ├── logic/                     # Reglas de negocio puras (sin UI ni Riverpod)
 │   ├── activos/  movimientos/  metas/  deudas/
 │   ├── prestamos/  inversiones/  cotizaciones/  presupuesto/
 │   ├── estadisticas/          # Agregados y series para los gráficos
-│   ├── backup/  seguridad/  categorias/
+│   ├── backup/  categorias/
 ├── shared/                    # Tema, formato de números y widgets comunes
 └── ui/                        # Pantallas agrupadas por módulo
 ```
@@ -189,8 +182,11 @@ Requisitos previos: Flutter 3 instalado y en el `PATH`.
 # Obtener dependencias
 flutter pub get
 
-# Generar los iconos de la app (opcional)
-dart run flutter_launcher_icons
+# Generar los iconos de la app (opcional).
+# Toma assets/icon/icon.png como única fuente y escribe los iconos de Android,
+# iOS, macOS, Windows, web y la tienda. Hay que ejecutarlo con PowerShell, que
+# es lo que el script necesita para redimensionar los PNG.
+powershell -ExecutionPolicy Bypass -NoProfile -File tool\generate_launcher_icons.ps1
 
 # Análisis estático
 flutter analyze
@@ -213,18 +209,25 @@ El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente e
 
 ## Pruebas
 
-`test/widget_test.dart` contiene una prueba de humo que verifica que la app arranca y renderiza la pantalla de inicio. La cobertura de pruebas unitarias de la lógica de cálculo está pendiente.
+Cuatro archivos en `test/`, todos con pruebas que pasan sin base de datos ni red:
+
+- `test/widget_test.dart`: prueba de humo que verifica que la app arranca y renderiza la pantalla de inicio, y que volver de segundo plano no monta la pantalla de desbloqueo.
+- `test/navigation_test.dart`: la barra de las cuatro pestañas, el menú lateral y la apertura de cada sección de Configuración.
+- `test/acentos_test.dart`: contraste de los siete colores de marca y migración desde el acento rojo antiguo.
+- `test/gastos_logic_test.dart`: cálculos de gastos presupuestados y gastos diarios.
+
+La cobertura de pruebas unitarias del resto de `lib/logic/` sigue pendiente.
 
 ## Privacidad
 
 - Todos los datos se almacenan localmente en el dispositivo.
 - No hay servidor, sincronización en la nube ni permisos de red: la app no transmite información financiera a ningún servicio.
-- El único secreto (el hash del PIN) se guarda cifrado por el sistema operativo.
+- La app no guarda credenciales: no hay PIN ni biometría, y todo lo que se almacena son movimientos, saldos, categorías y preferencias de presentación.
 
 ## Limitaciones conocidas y trabajo futuro
 
 - **Asistente financiero con IA:** no implementado. No hay dependencias de red ni integraciones con modelos de lenguaje; las recomendaciones actuales provienen de fórmulas deterministas.
 - **Reportes exportables:** los gráficos solo se muestran en pantalla, no se exportan a PDF ni se comparten.
-- **Notificaciones y recordatorios:** la preferencia está contemplada, pero no hay motor de notificaciones implementado.
+- **Notificaciones y recordatorios:** no hay ninguna. La app no pide el permiso de notificaciones ni publica avisos.
 - **Conversión de divisas:** los activos en distintas monedas se suman directamente, sin conversión.
-- **Cobertura de pruebas:** solo existe la prueba de humo; los cálculos de `lib/logic/` aún no tienen pruebas unitarias.
+- **Cobertura de pruebas:** solo cuatro archivos, ninguno sobre `movimientos/`, `deudas/`, `metas/` ni `estadisticas/`.

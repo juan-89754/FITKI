@@ -224,21 +224,25 @@ class _Header extends StatelessWidget {
     final topPadding = MediaQuery.of(context).padding.top;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, topPadding + 20, 20, 36),
+      padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 36),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
+      // El recorte evita que los círculos decorativos se salgan del bloque
+      // verde: antes se cortaban contra el borde de la lista y se leían como un
+      // ícono incompleto junto al saludo.
       child: Stack(
+        clipBehavior: Clip.antiAlias,
         children: [
-          // Círculos decorativos en diagonal (arriba-izquierda y abajo-derecha)
-          // para que no compitan con el avatar de la esquina superior derecha.
+          // Decoración en la mitad baja, lejos de la fila del saludo: ahí el
+          // espacio está libre y el texto se lee sin nada detrás.
           Positioned(
-            left: -24,
-            top: -30,
+            left: -46,
+            top: 104,
             child: Container(
-              width: 130,
-              height: 130,
+              width: 148,
+              height: 148,
               decoration: BoxDecoration(
                 color: AppColors.orange.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
@@ -246,11 +250,11 @@ class _Header extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: -20,
-            bottom: -40,
+            right: -30,
+            bottom: -34,
             child: Container(
-              width: 100,
-              height: 100,
+              width: 108,
+              height: 108,
               decoration: BoxDecoration(
                 color: AppColors.coral.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
@@ -263,6 +267,33 @@ class _Header extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // El menú va a la izquierda y el avatar se queda en la
+                  // esquina superior derecha. Ambos miden 44 para que queden
+                  // alineados al mismo eje.
+                  IconButton(
+                    onPressed:
+                        context
+                            .dependOnInheritedWidgetOfExactType<
+                              _ShellDrawerScope
+                            >()
+                            ?.openDrawer,
+                    tooltip: 'Abrir menú',
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      fixedSize: const Size.square(44),
+                      minimumSize: const Size.square(44),
+                      maximumSize: const Size.square(44),
+                      backgroundColor: AppColors.textOnPrimary.withValues(
+                        alpha: 0.15,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      color: AppColors.textOnPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,36 +320,12 @@ class _Header extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed:
-                            context
-                                .dependOnInheritedWidgetOfExactType<
-                                  _ShellDrawerScope
-                                >()
-                                ?.openDrawer,
-                        tooltip: 'Abrir menú',
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.textOnPrimary
-                              .withValues(alpha: 0.15),
-                        ),
-                        icon: const Icon(
-                          Icons.menu_rounded,
-                          color: AppColors.textOnPrimary,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      PerfilAvatar(
-                        nombre: perfil?.nombre ?? '',
-                        fotoPath: perfil?.fotoPath,
-                        size: 44,
-                        onTap: () => context.push('/configuraciones/perfil'),
-                      ),
-                    ],
+                  const SizedBox(width: 14),
+                  PerfilAvatar(
+                    nombre: perfil?.nombre ?? '',
+                    fotoPath: perfil?.fotoPath,
+                    size: 44,
+                    onTap: () => context.push('/configuraciones/perfil'),
                   ),
                 ],
               ),
@@ -395,24 +402,18 @@ class _CategoriasState extends State<_Categorias> {
                     label: 'Movimientos',
                     icon: Icons.swap_horiz_rounded,
                     amount: 0.0,
-                    featured: true,
-                    color: AppColors.primary,
                     onTap: () => irAMovimientos(context),
                   ),
                   (
                     label: 'Metas',
                     icon: Icons.flag_rounded,
                     amount: widget.metasTotal,
-                    featured: false,
-                    color: AppColors.orange,
                     onTap: () => context.push('/metas'),
                   ),
                   (
                     label: 'Deudas',
                     icon: Icons.account_balance_wallet_rounded,
                     amount: widget.deudasPendiente,
-                    featured: false,
-                    color: AppColors.coral,
                     onTap: () => context.push('/deudas'),
                   ),
                 ];
@@ -424,8 +425,6 @@ class _CategoriasState extends State<_Categorias> {
                     icon: cat.icon,
                     amount: cat.amount,
                     currency: r'$',
-                    featured: cat.featured,
-                    categoryColor: cat.color,
                     onTap: cat.onTap,
                   ),
                 );

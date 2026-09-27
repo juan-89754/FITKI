@@ -138,7 +138,7 @@ class _PrestamosTab extends ConsumerWidget {
               return _ResumenCard(
                 icon: Icons.currency_exchange_rounded,
                 iconColor: AppColors.primary,
-                iconBackground: AppColors.chipBackgroundGreen,
+                iconBackground: AppColors.chipBackgroundPrimary,
                 label: 'Total prestado activo',
                 valor: currency(totalActivo),
                 subtitulo: 'Préstamos pendientes de cobro',
@@ -437,7 +437,7 @@ class _PrestamoCard extends StatelessWidget {
 
   Widget _iconoPrestamo() {
     final backgroundColor = estado == 'pagado_total'
-        ? AppColors.chipBackgroundGreen
+        ? AppColors.chipBackgroundPrimary
         : (vencido ? AppColors.chipBackgroundCoral : AppColors.mintPale);
     final iconColor = estado == 'pagado_total'
         ? AppColors.primary
@@ -472,7 +472,7 @@ class _ChipEstado extends StatelessWidget {
     Color foreground;
     switch (estado) {
       case 'pagado_total':
-        background = AppColors.chipBackgroundGreen;
+        background = AppColors.chipBackgroundPrimary;
         foreground = AppColors.primary;
         break;
       case 'pagado_parcial':
