@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0C6E4E</color>
+    <!--
+      Color del splash. En claro usa el verde de marca (el mismo del icono) y
+      en oscuro el #121212 de la app, para que la transicion a la primera
+      pantalla no se vea como un salto de blanco.
+    -->
+    <color name="fitki_splash">#0C6E4E</color>
+</resources>

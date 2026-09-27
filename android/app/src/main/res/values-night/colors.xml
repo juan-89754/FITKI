@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash en modo oscuro: el fondo real de la app, sin destello. -->
+    <color name="fitki_splash">#121212</color>
+</resources>

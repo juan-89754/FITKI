@@ -1,0 +1,335 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../../shared/format/app_format.dart';
+import '../../../shared/format/miles_input_formatter.dart';
+import '../../../shared/theme/app_colors.dart';
+import '../../../data/models/investment.dart';
+import '../../../data/providers/shared_providers.dart';
+import '../../../logic/inversiones/inversiones_logic.dart';
+
+class InversionFormScreen extends ConsumerStatefulWidget {
+  final Investment? inversion;
+
+  const InversionFormScreen({super.key, this.inversion});
+
+  @override
+  ConsumerState<InversionFormScreen> createState() =>
+      _InversionFormScreenState();
+}
+
+class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _montoController = TextEditingController();
+  final _tasaController = TextEditingController();
+  final _gananciaController = TextEditingController();
+  final _notasController = TextEditingController();
+
+  String _tipo = 'divisas';
+  String _periodoTasa = 'anual';
+  DateTime _fecha = DateTime.now();
+
+  bool get _editando => widget.inversion != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final inversion = widget.inversion;
+    if (inversion != null) {
+      _tipo = Investment.tiposValidos.contains(inversion.tipo)
+          ? inversion.tipo
+          : 'otro';
+      _periodoTasa = Investment.periodosValidos.contains(inversion.periodoTasa)
+          ? inversion.periodoTasa
+          : 'anual';
+      _montoController.text = AppFormat.montoParaEditar(inversion.montoInvertido);
+      _tasaController.text = inversion.tasaRendimiento != null
+          ? inversion.tasaRendimiento!.toStringAsFixed(2)
+          : '';
+      _gananciaController.text = inversion.gananciaObtenida != null
+          ? AppFormat.montoParaEditar(inversion.gananciaObtenida!)
+          : '';
+      _notasController.text = inversion.notas ?? '';
+      _fecha = inversion.fecha;
+    }
+  }
+
+  @override
+  void dispose() {
+    _montoController.dispose();
+    _tasaController.dispose();
+    _gananciaController.dispose();
+    _notasController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(_editando ? 'Editar inversión' : 'Nueva inversión'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.textOnPrimary,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _campoTipo(),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _montoController,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [MilesInputFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Monto invertido *',
+                  hintText: 'Ej. 1.000.000',
+                  prefixText: r'$ ',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El monto invertido es obligatorio';
+                  }
+                  final monto = milesADouble(value);
+                  if (monto == null || monto <= 0) {
+                    return 'Ingresa un monto válido';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _tasaController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Tasa de rendimiento % (opcional)',
+                  hintText: 'Ej. 12.5',
+                  suffixText: '%',
+                ),
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    final tasa = double.tryParse(value.replaceFirst(',', '.'));
+                    if (tasa == null || tasa < 0) {
+                      return 'Ingresa una tasa válida';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              _campoPeriodoTasa(),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _gananciaController,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [MilesInputFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Ganancia obtenida (opcional)',
+                  hintText: 'Solo si ya sabes cuánto rendiste',
+                  prefixText: r'$ ',
+                ),
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    final monto = milesADouble(value);
+                    if (monto == null || monto < 0) {
+                      return 'Ingresa una ganancia válida';
+                    }
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              _campoFecha(),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _notasController,
+                maxLines: 3,
+                maxLength: 300,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Notas (opcional)',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _guardar,
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text(
+                    _editando ? 'Guardar cambios' : 'Registrar inversión',
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textOnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _campoTipo() {
+    return DropdownButtonFormField<String>(
+      initialValue: _tipo,
+      decoration: const InputDecoration(labelText: 'Tipo de inversión'),
+      items: Investment.tiposValidos
+          .map((tipo) => DropdownMenuItem(
+                value: tipo,
+                child: Text(InversionesLogic.labelTipo(tipo)),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value != null) setState(() => _tipo = value);
+      },
+    );
+  }
+
+  Widget _campoPeriodoTasa() {
+    return DropdownButtonFormField<String>(
+      initialValue: _periodoTasa,
+      decoration: const InputDecoration(labelText: 'Período de la tasa'),
+      items: Investment.periodosValidos
+          .map((periodo) => DropdownMenuItem(
+                value: periodo,
+                child: Text(InversionesLogic.labelPeriodo(periodo)),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value != null) setState(() => _periodoTasa = value);
+      },
+    );
+  }
+
+  Widget _campoFecha() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Fecha de la inversión *',
+          style: Theme.of(context).textTheme.titleSmall!.copyWith(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _seleccionarFecha,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  DateFormat('dd MMM yyyy').format(_fecha),
+                  style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _seleccionarFecha() async {
+    final hoy = DateTime.now();
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: _fecha,
+      firstDate: DateTime(hoy.year - 5),
+      lastDate: hoy,
+      helpText: 'Fecha de la inversión',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: AppColors.primary,
+                onPrimary: AppColors.textOnPrimary,
+              ),
+        ),
+        child: child!,
+      ),
+    );
+    if (fecha != null) setState(() => _fecha = fecha);
+  }
+
+  Future<void> _guardar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final inversionActual = widget.inversion;
+    final monto = milesADouble(_montoController.text) ?? 0;
+    final tasa = _tasaController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_tasaController.text.replaceFirst(',', '.'));
+    final ganancia = _gananciaController.text.trim().isEmpty
+        ? null
+        : milesADouble(_gananciaController.text);
+
+    final inversion = Investment(
+      id: inversionActual?.id,
+      tipo: _tipo,
+      montoInvertido: monto,
+      tasaRendimiento: tasa,
+      periodoTasa: _periodoTasa,
+      gananciaProyectada: inversionActual?.gananciaProyectada,
+      gananciaObtenida: ganancia,
+      fecha: _fecha,
+      notas: _notasController.text.trim().isEmpty
+          ? null
+          : _notasController.text.trim(),
+      fechaCreacion: inversionActual?.fechaCreacion ?? DateTime.now(),
+    );
+
+    final repo = ref.read(inversionRepositoryProvider);
+    try {
+      if (_editando) {
+        await repo.update(inversion);
+      } else {
+        await repo.insert(inversion);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo guardar, intenta de nuevo'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) Navigator.pop(context, true);
+  }
+}

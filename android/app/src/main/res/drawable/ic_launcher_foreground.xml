@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monograma "F" de Fitki.
+
+  Viewport de 108x108 como exige un icono adaptativo. La zona segura es el
+  66% central (21..87): la F ocupa 39..69 en X y 29..79 en Y, así que nunca
+  la recortan los recortes circulares ni los squircles de cada fabricante.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39,29 h30 v9 h-21 v11 h18 v9 h-18 v21 h-9 z" />
+</vector>

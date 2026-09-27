@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Splash para Android 11 y anteriores. El color sale de @color/fitki_splash,
+      que ya cambia solo segun el modo claro/oscuro.
+    -->
+    <item android:drawable="@color/fitki_splash" />
+</layer-list>
