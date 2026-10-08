@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'shared/theme/app_colors.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/theme_providers.dart';
+import 'shared/widgets/page_shell_container.dart';
 import 'ui/home/home_screen.dart';
 import 'ui/activos/screens/activos_screen.dart';
 import 'ui/movimientos/screens/movimientos_screen.dart';
@@ -24,17 +25,19 @@ import 'ui/configuraciones/screens/categorias_screen.dart';
 
 // Estructura de navegación de Fitki.
 //
-// El shell tiene SOLO 4 ramas (las cuatro pestañas de la barra inferior) y
-// preserva el estado de cada una. Todo lo demás (Deudas, Préstamos e
-// inversiones, Estadísticas, Cotizaciones, Metas, Categorías y
-// Configuración) son secciones que se empujan por encima del shell desde el
-// menú lateral: al entrar se ocultan la barra y el menú, y el botón atrás
-// devuelve exactamente al punto desde el que se entró.
+// El shell tiene 11 ramas: cada módulo de la app es una pestaña de la barra
+// inferior y se llega a todas deslizando o tocando. Antes solo cuatro eran
+// pestañas y las otras siete vivían en un menú lateral; ahora todas son ramas
+// del mismo [StatefulShellRoute] y el menú desapareció.
+//
+// El contenedor de las ramas es un PageView (ver `PageShellContainer`), así que
+// además de tocar la barra se puede pasar de módulo con el dedo. Cada rama
+// conserva su Navigator, de modo que la posición de scroll y los filtros de
+// cada módulo sobreviven al ida y vuelta.
 //
 // Regla de verbos:
-//   - cambiar de pestaña  -> navigationShell.goBranch
-//   - entrar a una sección -> context.push (destino fuera del shell)
-//   - ir a una subpantalla -> context.push
+//   - cambiar de módulo  -> navigationShell.goBranch (helper `irAModulo`)
+//   - ir a una subpantalla de un módulo -> context.push (dentro de la rama)
 //
 // OJO con las rutas: go_router NO resuelve las rutas relativas contra la ruta
 // actual, sino contra la raíz. `context.push('apariencia')` desde
@@ -46,7 +49,12 @@ import 'ui/configuraciones/screens/categorias_screen.dart';
 GoRouter buildRouter() => GoRouter(
   initialLocation: '/',
   routes: [
-    StatefulShellRoute.indexedStack(
+    StatefulShellRoute(
+      navigatorContainerBuilder:
+          (context, navigationShell, children) => PageShellContainer(
+            navigationShell: navigationShell,
+            children: children,
+          ),
       builder: (context, state, navigationShell) =>
           HomeShell(navigationShell: navigationShell),
       branches: [
@@ -82,50 +90,78 @@ GoRouter buildRouter() => GoRouter(
             ),
           ],
         ),
-      ],
-    ),
-
-    // Secciones del menú lateral: fuera del shell a propósito, para que la
-    // barra inferior no quede flotando sobre ellas y el atrás sea coherente.
-    GoRoute(
-      path: '/deudas',
-      builder: (context, state) => const DeudasScreen(),
-    ),
-    GoRoute(
-      path: '/prestamos-inversiones',
-      builder: (context, state) => const PrestamosInversionesScreen(),
-    ),
-    GoRoute(
-      path: '/estadisticas',
-      builder: (context, state) => const EstadisticasScreen(),
-    ),
-    GoRoute(
-      path: '/cotizaciones',
-      builder: (context, state) => const ProyectosScreen(),
-    ),
-    GoRoute(
-      path: '/metas',
-      builder: (context, state) => const MetasScreen(),
-    ),
-    GoRoute(
-      path: '/categorias',
-      builder: (context, state) => const CategoriasScreen(),
-    ),
-    GoRoute(
-      path: '/configuraciones',
-      builder: (context, state) => const ConfiguracionesScreen(),
-      routes: [
-        GoRoute(
-          path: 'perfil',
-          builder: (context, state) => const PerfilScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/deudas',
+              builder: (context, state) => const DeudasScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: 'backup',
-          builder: (context, state) => const BackupScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/metas',
+              builder: (context, state) => const MetasScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: 'apariencia',
-          builder: (context, state) => const AparienciaScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/prestamos-inversiones',
+              builder: (context, state) => const PrestamosInversionesScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/estadisticas',
+              builder: (context, state) => const EstadisticasScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/cotizaciones',
+              builder: (context, state) => const ProyectosScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/categorias',
+              builder: (context, state) => const CategoriasScreen(),
+            ),
+          ],
+        ),
+        // Configuración es la única rama con hijas: Perfil, Backup y Apariencia
+        // se apilan sobre su Navigator, así que el atrás devuelve a la lista y
+        // no salta de módulo.
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/configuraciones',
+              builder: (context, state) => const ConfiguracionesScreen(),
+              routes: [
+                GoRoute(
+                  path: 'perfil',
+                  builder: (context, state) => const PerfilScreen(),
+                ),
+                GoRoute(
+                  path: 'backup',
+                  builder: (context, state) => const BackupScreen(),
+                ),
+                GoRoute(
+                  path: 'apariencia',
+                  builder: (context, state) => const AparienciaScreen(),
+                ),
+              ],
+            ),
+          ],
         ),
       ],
     ),

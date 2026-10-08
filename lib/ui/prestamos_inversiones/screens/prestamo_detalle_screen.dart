@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../logic/prestamos/prestamos_logic.dart';
 import '../../../data/providers/shared_providers.dart';
+import '../../movimientos/movimientos_providers.dart';
 import '../prestamos_inversiones_providers.dart';
 import 'prestamo_form_screen.dart';
 
@@ -29,6 +31,15 @@ class PrestamoDetalleScreen extends ConsumerWidget {
 
     final estado = PrestamosLogic.estadoDe(actual);
     final pagado = estado == 'pagado_total';
+    final activos =
+        ref.watch(activosStreamProvider).asData?.value ?? const <Asset>[];
+    String? nombreActivo;
+    for (final activo in activos) {
+      if (activo.id == actual.activoId) {
+        nombreActivo = activo.nombre;
+        break;
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -38,7 +49,7 @@ class PrestamoDetalleScreen extends ConsumerWidget {
         foregroundColor: AppColors.textOnPrimary,
         actions: [
           IconButton(
-            onPressed: () => _eliminar(context, ref, actual),
+            onPressed: () => _eliminar(context, ref, actual, nombreActivo),
             icon: const Icon(Icons.delete_outline_rounded),
             tooltip: 'Eliminar préstamo',
           ),
@@ -49,7 +60,11 @@ class PrestamoDetalleScreen extends ConsumerWidget {
         children: [
           _Encabezado(prestamo: actual, estado: estado),
           const SizedBox(height: 16),
-          _DatosPrestamo(prestamo: actual, estado: estado),
+          _DatosPrestamo(
+            prestamo: actual,
+            estado: estado,
+            nombreActivo: nombreActivo,
+          ),
           if (actual.condiciones != null) ...[
             const SizedBox(height: 16),
             _CardInfo(
@@ -109,12 +124,16 @@ class PrestamoDetalleScreen extends ConsumerWidget {
     WidgetRef ref,
     Loan prestamo,
   ) async {
-    final monto = await _dialogoPago(context, prestamo);
-    if (monto == null) return;
+    final resultado = await _dialogoPago(context, ref, prestamo);
+    if (resultado == null) return;
 
     final repo = ref.read(prestamoRepositoryProvider);
     try {
-      final actualizado = await repo.registrarPago(prestamo.id!, monto);
+      final actualizado = await repo.registrarPago(
+        prestamo.id!,
+        resultado.monto,
+        activoDestino: resultado.activoId,
+      );
       if (actualizado == 0) {
         throw Exception('No se encontró el préstamo');
       }
@@ -130,90 +149,144 @@ class PrestamoDetalleScreen extends ConsumerWidget {
     }
 
     ref.invalidate(prestamosStreamProvider);
+    ref.invalidate(movimientosStreamProvider);
+    ref.invalidate(activosStreamProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago registrado')),
+        SnackBar(
+          content: Text(
+            'Pago registrado. ${AppFormat.moneda(resultado.monto)} '
+            'sumados al activo.',
+          ),
+        ),
       );
     }
   }
 
-  Future<double?> _dialogoPago(BuildContext context, Loan prestamo) async {
+  /// Diálogo del reembolso. Muestra a qué cuenta vuelve el dinero y deja
+  /// cambiarla: normalmente es la misma de la que salió el préstamo, pero si esa
+  /// cuenta se borró el usuario tiene que elegir otra (sin cuenta de destino el
+  /// dinero aparecería de la nada).
+  Future<({double monto, int activoId})?> _dialogoPago(
+    BuildContext context,
+    WidgetRef ref,
+    Loan prestamo,
+  ) async {
+    final activos = ref.read(activosStreamProvider).asData?.value ??
+        const <Asset>[];
     final restante = PrestamosLogic.montoRestante(prestamo);
     final montoController = TextEditingController(
       text: restante > 0 ? AppFormat.montoParaEditar(restante) : '',
     );
 
-    final monto = await showDialog<double>(
+    final origenEliminado = activos.isNotEmpty &&
+        (prestamo.activoId == null ||
+            !activos.any((a) => a.id == prestamo.activoId));
+    int? activoId = origenEliminado ? null : prestamo.activoId;
+
+    final resultado = await showDialog<({double monto, int activoId})>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Registrar pago'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: montoController,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: const [MilesInputFormatter()],
-                  decoration: const InputDecoration(
-                    labelText: 'Monto recibido',
-                    hintText: 'Ej. 300.000',
-                    prefixText: r'$ ',
+        return StatefulBuilder(
+          builder: (ctx, setState) => AlertDialog(
+            title: const Text('Registrar pago'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: montoController,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: const [MilesInputFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Monto recibido',
+                      hintText: 'Ej. 300.000',
+                      prefixText: r'$ ',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Restante por cobrar: ${_formatearMonto(restante)}',
-                  style: Theme.of(context).textTheme.bodySmall!,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final valor = milesADouble(montoController.text);
-                if (valor == null || valor <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ingresa un monto válido'),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    initialValue: activoId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cuenta que recibe el pago *',
                     ),
-                  );
-                  return;
-                }
-                if (valor > restante) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'El pago no puede superar el monto restante de '
-                        '${_formatearMonto(restante)}',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                Navigator.pop(ctx, valor);
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
+                    items: [
+                      for (final activo in activos)
+                        DropdownMenuItem<int>(
+                          value: activo.id,
+                          child: Text(
+                            '${activo.nombre} · '
+                            '${AppFormat.moneda(activo.montoDisponible)}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() => activoId = value),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    origenEliminado
+                        ? 'La cuenta de la que salió este préstamo ya no '
+                            'existe, así que el pago debe entrar a una cuenta '
+                            'de tu elección.'
+                        : 'El pago se suma al saldo de esa cuenta.',
+                    style: Theme.of(ctx).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Restante por cobrar: ${_formatearMonto(restante)}',
+                    style: Theme.of(ctx).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              child: const Text('Guardar'),
             ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final valor = milesADouble(montoController.text);
+                  if (valor == null || valor <= 0) {
+                    _avisar(ctx, 'Ingresa un monto válido');
+                    return;
+                  }
+                  if (valor > restante) {
+                    _avisar(
+                      ctx,
+                      'El pago no puede superar el monto restante de '
+                      '${_formatearMonto(restante)}',
+                    );
+                    return;
+                  }
+                  if (activoId == null) {
+                    _avisar(ctx, 'Elige la cuenta que recibe el pago');
+                    return;
+                  }
+                  Navigator.pop(ctx, (monto: valor, activoId: activoId));
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnPrimary,
+                ),
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
         );
       },
     );
 
     montoController.dispose();
-    return monto;
+    return resultado;
+  }
+
+  void _avisar(BuildContext context, String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
   String _formatearMonto(double valor) {
@@ -228,17 +301,31 @@ class PrestamoDetalleScreen extends ConsumerWidget {
       ),
     )
         .then((guardado) {
-      if (guardado == true) ref.invalidate(prestamosStreamProvider);
+      if (guardado == true) {
+        ref.invalidate(prestamosStreamProvider);
+        ref.invalidate(movimientosStreamProvider);
+        ref.invalidate(activosStreamProvider);
+      }
     });
   }
 
-  void _eliminar(BuildContext context, WidgetRef ref, Loan prestamo) {
+  void _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    Loan prestamo,
+    String? nombreActivo,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar préstamo'),
         content: Text(
-          '¿Eliminar el préstamo a ${prestamo.nombreBeneficiario}?',
+          '¿Eliminar el préstamo a ${prestamo.nombreBeneficiario}?\n\n'
+          'Se borrarán sus movimientos y el dinero volverá a '
+          '${nombreActivo ?? 'la cuenta de origen'}: '
+          '${AppFormat.moneda(prestamo.montoPrestado)} '
+          'que prestaste y ${AppFormat.moneda(prestamo.montoPagado)} '
+          'que ya recuperaste.',
         ),
         actions: [
           TextButton(
@@ -260,6 +347,8 @@ class PrestamoDetalleScreen extends ConsumerWidget {
                 return;
               }
               ref.invalidate(prestamosStreamProvider);
+              ref.invalidate(movimientosStreamProvider);
+              ref.invalidate(activosStreamProvider);
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) Navigator.pop(context, true);
             },
@@ -350,8 +439,13 @@ class _Encabezado extends StatelessWidget {
 class _DatosPrestamo extends StatelessWidget {
   final Loan prestamo;
   final String estado;
+  final String? nombreActivo;
 
-  const _DatosPrestamo({required this.prestamo, required this.estado});
+  const _DatosPrestamo({
+    required this.prestamo,
+    required this.estado,
+    required this.nombreActivo,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +453,11 @@ class _DatosPrestamo extends StatelessWidget {
     final restante = PrestamosLogic.montoRestante(prestamo);
 
     final filas = <_FilaDesglose>[
+      _FilaDesglose(
+        label: 'Cuenta de origen',
+        value: nombreActivo ?? 'Cuenta eliminada',
+        valorGris: nombreActivo == null,
+      ),
       _FilaDesglose(
         label: 'Fecha del préstamo',
         value: DateFormat('dd MMM yyyy').format(prestamo.fechaPrestamo),
@@ -423,11 +522,13 @@ class _FilaDesglose extends StatelessWidget {
   final String label;
   final String value;
   final bool destacado;
+  final bool valorGris;
 
   const _FilaDesglose({
     required this.label,
     required this.value,
     this.destacado = false,
+    this.valorGris = false,
   });
 
   @override
@@ -448,7 +549,11 @@ class _FilaDesglose extends StatelessWidget {
             textAlign: TextAlign.end,
             style: Theme.of(context).textTheme.titleSmall!.copyWith(
               fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-              color: destacado ? AppColors.primary : AppColors.textPrimary,
+color: destacado
+                      ? AppColors.primary
+                      : (valorGris
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary),
             ),
           ),
         ),

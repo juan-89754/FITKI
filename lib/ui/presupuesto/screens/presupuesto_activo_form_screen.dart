@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/models/abono_meta.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/gasto_fijo.dart';
+import '../../../data/models/investment.dart';
 import '../../../data/models/presupuesto_activo.dart';
 import '../../../data/providers/shared_providers.dart';
+import '../../../logic/activos/activos_logic.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../metas/metas_providers.dart';
+import '../../prestamos_inversiones/prestamos_inversiones_providers.dart';
 import '../presupuesto_providers.dart';
 
 /// Alta y edición del límite de gasto de una cuenta en el mes visible.
@@ -141,6 +146,18 @@ class _PresupuestoActivoFormScreenState
     final periodo = ref.watch(periodoVisibleProvider);
     final activos = ref.watch(activosStreamProvider).asData?.value ?? const <Asset>[];
     final activosVisibles = activos.where((a) => a.id == widget.activo.id);
+    final registros = ref.watch(registrosDeMetasProvider).asData?.value ?? const <AbonoMeta>[];
+    final inversiones =
+        ref.watch(inversionesStreamProvider).asData?.value ?? const <Investment>[];
+    final saldoTotal = widget.activo.montoDisponible;
+    final reservado = ActivosLogic.saldoReservadoEn(widget.activo.id, registros);
+    final reservadoInversiones =
+        ActivosLogic.saldoReservadoInversionesEn(widget.activo.id, inversiones);
+    final saldoDisponible = ActivosLogic.saldoDisponible(
+      saldoTotal,
+      reservado,
+      reservadoInversiones: reservadoInversiones,
+    );
     final sugerencia = _sugerenciaFijos;
     final editando = widget.presupuesto != null;
 
@@ -199,15 +216,55 @@ class _PresupuestoActivoFormScreenState
                       labelText: 'Límite de gasto del mes',
                       prefixText: r'$ ',
                       helperText: 'Cuánto quieres gastar de esta cuenta',
+                      helperMaxLines: 2,
                     ),
                     validator: (v) {
                       final monto = milesADouble(v);
                       if (monto == null || monto <= 0) {
                         return 'Escribe un monto mayor a 0';
                       }
+                      // El límite se compara contra el Saldo Disponible, no
+                      // contra el total: un presupuesto que exceda lo que no
+                      // está en metas promete algo que no se puede cumplir.
+                      if (monto > saldoDisponible) {
+                        return 'Esta cuenta solo tiene '
+                            '${AppFormat.moneda(saldoDisponible)} disponibles.';
+                      }
                       return null;
                     },
                   ),
+                  if (reservado > 0) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.mintPale,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.lock_outline_rounded,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'De ${AppFormat.moneda(saldoTotal)} tienes '
+                              '${AppFormat.moneda(reservado)} reservados en '
+                              'metas, así que puedes gastar '
+                              '${AppFormat.moneda(saldoDisponible)}.',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (sugerencia > 0) ...[
                     const SizedBox(height: 12),
                     Container(

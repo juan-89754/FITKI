@@ -7,6 +7,8 @@ import '../../../data/models/loan.dart';
 import '../../../data/models/investment.dart';
 import '../../../logic/prestamos/prestamos_logic.dart';
 import '../../../logic/inversiones/inversiones_logic.dart';
+import '../../../data/providers/shared_providers.dart';
+import '../../movimientos/movimientos_providers.dart';
 import '../prestamos_inversiones_providers.dart';
 import 'prestamo_form_screen.dart';
 import 'inversion_form_screen.dart';
@@ -101,6 +103,8 @@ class _PrestamosInversionesScreenState
       if (guardado == true) {
         ref.invalidate(prestamosStreamProvider);
         ref.invalidate(inversionesStreamProvider);
+        ref.invalidate(movimientosStreamProvider);
+        ref.invalidate(activosStreamProvider);
       }
     });
   }
@@ -176,7 +180,11 @@ class _PrestamosTab extends ConsumerWidget {
       MaterialPageRoute(builder: (_) => PrestamoDetalleScreen(prestamo: prestamo)),
     )
         .then((cambio) {
-      if (cambio == true) ref.invalidate(prestamosStreamProvider);
+      if (cambio == true) {
+        ref.invalidate(prestamosStreamProvider);
+        ref.invalidate(movimientosStreamProvider);
+        ref.invalidate(activosStreamProvider);
+      }
     });
   }
 }
@@ -201,13 +209,12 @@ class _InversionesTab extends ConsumerWidget {
 
         const currency = AppFormat.moneda;
         final resumenes = InversionesLogic.resumenPorTipo(inversiones);
-        final totalInvertido = resumenes.fold<double>(
+        final totalReservado = inversiones
+            .where((inv) => inv.estaActiva)
+            .fold<double>(0, (acumulado, inv) => acumulado + inv.montoInvertido);
+        final totalResultado = inversiones.fold<double>(
           0,
-          (acumulado, resumen) => acumulado + resumen.totalInvertido,
-        );
-        final totalGanancia = resumenes.fold<double>(
-          0,
-          (acumulado, resumen) => acumulado + resumen.gananciaTotal,
+          (acumulado, inv) => acumulado + (inv.gananciaObtenida ?? 0),
         );
 
         return ListView(
@@ -217,9 +224,9 @@ class _InversionesTab extends ConsumerWidget {
               icon: Icons.trending_up_rounded,
               iconColor: AppColors.oliveGreen,
               iconBackground: AppColors.chipBackgroundOlive,
-              label: 'Total invertido',
-              valor: currency(totalInvertido),
-              subtitulo: 'Ganancia obtenida: ${currency(totalGanancia)}',
+              label: 'Capital reservado',
+              valor: currency(totalReservado),
+              subtitulo: 'Resultado: ${currency(totalResultado)}',
             ),
             const SizedBox(height: 16),
             for (final resumen in resumenes) ...[
@@ -263,7 +270,11 @@ class _InversionesTab extends ConsumerWidget {
       ),
     )
         .then((cambio) {
-      if (cambio == true) ref.invalidate(inversionesStreamProvider);
+      if (cambio == true) {
+        ref.invalidate(inversionesStreamProvider);
+        ref.invalidate(movimientosStreamProvider);
+        ref.invalidate(activosStreamProvider);
+      }
     });
   }
 }
@@ -682,6 +693,8 @@ class _InversionCard extends StatelessWidget {
                     DateFormat('dd MMM yyyy').format(inversion.fecha),
                     style: Theme.of(context).textTheme.bodySmall!,
                   ),
+                  const Spacer(),
+                  _ChipEstadoInversion(activa: inversion.estaActiva),
                 ],
               ),
             ],
@@ -713,6 +726,30 @@ class _ChipTasa extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall!.copyWith(
           fontWeight: FontWeight.w600,
           color: esTasa ? AppColors.oliveGreen : AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _ChipEstadoInversion extends StatelessWidget {
+  final bool activa;
+
+  const _ChipEstadoInversion({required this.activa});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: activa ? AppColors.chipBackgroundOlive : AppColors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        activa ? 'Activa' : 'Finalizada',
+        style: Theme.of(context).textTheme.bodySmall!.copyWith(
+          fontWeight: FontWeight.w600,
+          color: activa ? AppColors.oliveGreen : AppColors.textSecondary,
         ),
       ),
     );

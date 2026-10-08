@@ -2,7 +2,12 @@
 <!--
   Icono adaptativo de Fitki. Generado por tool\generate_launcher_icons.ps1 a
   partir de assets\icon\icon.png: el fondo es el color de marca y el primer
-  plano es el recorte central seguro del logo.
+  plano es el logo reducido dentro de la zona segura (70% del lienzo de 108dp).
+
+  El logo NO se amplia hasta llenar el lienzo: el launcher recorta los 72dp
+  centrales, y arte a tamano completo se veria cortado por el recorte. El margen
+  sobrante del primer plano es transparente y no se nota, porque el fondo del
+  logo es exactamente este mismo color.
 
   La capa monochrome se omite a proposito: Android 13+ la tine con un unico
   color usando el canal alfa, y un logo opaco produciria un bloque solido.

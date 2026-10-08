@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../data/models/asset.dart';
+import '../../../data/models/investment.dart';
+import '../../../data/providers/shared_providers.dart';
+import '../../../data/repositories/inversion_repository.dart';
+import '../../../logic/inversiones/inversiones_logic.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
-import '../../../data/models/investment.dart';
-import '../../../data/providers/shared_providers.dart';
-import '../../../logic/inversiones/inversiones_logic.dart';
 
 class InversionFormScreen extends ConsumerStatefulWidget {
   final Investment? inversion;
@@ -23,11 +25,11 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _montoController = TextEditingController();
   final _tasaController = TextEditingController();
-  final _gananciaController = TextEditingController();
   final _notasController = TextEditingController();
 
   String _tipo = 'divisas';
   String _periodoTasa = 'anual';
+  int? _activoId;
   DateTime _fecha = DateTime.now();
 
   bool get _editando => widget.inversion != null;
@@ -43,14 +45,13 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
       _periodoTasa = Investment.periodosValidos.contains(inversion.periodoTasa)
           ? inversion.periodoTasa
           : 'anual';
-      _montoController.text = AppFormat.montoParaEditar(inversion.montoInvertido);
+      _montoController.text =
+          AppFormat.montoParaEditar(inversion.montoInvertido);
       _tasaController.text = inversion.tasaRendimiento != null
           ? inversion.tasaRendimiento!.toStringAsFixed(2)
           : '';
-      _gananciaController.text = inversion.gananciaObtenida != null
-          ? AppFormat.montoParaEditar(inversion.gananciaObtenida!)
-          : '';
       _notasController.text = inversion.notas ?? '';
+      _activoId = inversion.activoId;
       _fecha = inversion.fecha;
     }
   }
@@ -59,7 +60,6 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
   void dispose() {
     _montoController.dispose();
     _tasaController.dispose();
-    _gananciaController.dispose();
     _notasController.dispose();
     super.dispose();
   }
@@ -82,16 +82,23 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
             children: [
               _campoTipo(),
               const SizedBox(height: 16),
+              _campoActivo(),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _montoController,
+                enabled: !_editando,
                 keyboardType: TextInputType.number,
                 inputFormatters: const [MilesInputFormatter()],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Monto invertido *',
                   hintText: 'Ej. 1.000.000',
                   prefixText: r'$ ',
+                  helperText: _editando
+                      ? 'El capital se gestiona desde el detalle (aportar/retirar).'
+                      : null,
                 ),
                 validator: (value) {
+                  if (_editando) return null;
                   if (value == null || value.trim().isEmpty) {
                     return 'El monto invertido es obligatorio';
                   }
@@ -128,26 +135,6 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
               ),
               const SizedBox(height: 16),
               _campoPeriodoTasa(),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _gananciaController,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [MilesInputFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'Ganancia obtenida (opcional)',
-                  hintText: 'Solo si ya sabes cuánto rendiste',
-                  prefixText: r'$ ',
-                ),
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    final monto = milesADouble(value);
-                    if (monto == null || monto < 0) {
-                      return 'Ingresa una ganancia válida';
-                    }
-                  }
-                  return null;
-                },
-              ),
               const SizedBox(height: 16),
               _campoFecha(),
               const SizedBox(height: 20),
@@ -203,6 +190,54 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
     );
   }
 
+  Widget _campoActivo() {
+    final activosAsync = ref.watch(activosStreamProvider);
+    return activosAsync.when(
+      data: (activos) {
+        return DropdownButtonFormField<int?>(
+          initialValue: _activoId,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Cuenta de origen *',
+            helperText: _editando
+                ? 'La cuenta no se cambia al editar.'
+                : 'El dinero queda reservado desde esta cuenta.',
+          ),
+          hint: const Text('Elige una cuenta'),
+          items: activos
+              .map((asset) => DropdownMenuItem<int?>(
+                    value: asset.id,
+                    child: Text(
+                      '${asset.nombre} · ${_formatearSaldo(asset)}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ))
+              .toList(),
+          onChanged: _editando
+              ? null
+              : (value) => setState(() => _activoId = value),
+          validator: (value) {
+            if (_editando) return null;
+            if (value == null) return 'Elige la cuenta de origen';
+            return null;
+          },
+        );
+      },
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(8),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (e, _) => Text(
+        'Error cargando cuentas: $e',
+        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+              color: AppColors.coral,
+            ),
+      ),
+    );
+  }
+
   Widget _campoPeriodoTasa() {
     return DropdownButtonFormField<String>(
       initialValue: _periodoTasa,
@@ -226,9 +261,9 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
         Text(
           'Fecha de la inversión *',
           style: Theme.of(context).textTheme.titleSmall!.copyWith(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
         ),
         const SizedBox(height: 6),
         InkWell(
@@ -253,8 +288,8 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
                 Text(
                   DateFormat('dd MMM yyyy').format(_fecha),
                   style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+                        color: AppColors.textPrimary,
+                      ),
                 ),
               ],
             ),
@@ -262,6 +297,11 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
         ),
       ],
     );
+  }
+
+  String _formatearSaldo(Asset asset) {
+    final symbol = asset.moneda == 'USD' ? r'US$' : r'$';
+    return AppFormat.moneda(asset.montoDisponible, symbol: symbol);
   }
 
   Future<void> _seleccionarFecha() async {
@@ -289,26 +329,27 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final inversionActual = widget.inversion;
-    final monto = milesADouble(_montoController.text) ?? 0;
+    final monto = _editando
+        ? (inversionActual?.montoInvertido ?? 0)
+        : (milesADouble(_montoController.text) ?? 0);
     final tasa = _tasaController.text.trim().isEmpty
         ? null
         : double.tryParse(_tasaController.text.replaceFirst(',', '.'));
-    final ganancia = _gananciaController.text.trim().isEmpty
-        ? null
-        : milesADouble(_gananciaController.text);
 
     final inversion = Investment(
       id: inversionActual?.id,
       tipo: _tipo,
+      activoId: _activoId,
       montoInvertido: monto,
       tasaRendimiento: tasa,
       periodoTasa: _periodoTasa,
       gananciaProyectada: inversionActual?.gananciaProyectada,
-      gananciaObtenida: ganancia,
+      gananciaObtenida: inversionActual?.gananciaObtenida,
       fecha: _fecha,
       notas: _notasController.text.trim().isEmpty
           ? null
           : _notasController.text.trim(),
+      estado: inversionActual?.estado ?? Investment.estadoActiva,
       fechaCreacion: inversionActual?.fechaCreacion ?? DateTime.now(),
     );
 
@@ -319,6 +360,13 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
       } else {
         await repo.insert(inversion);
       }
+    } on OperacionInversionInvalida catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.mensaje)),
+        );
+      }
+      return;
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

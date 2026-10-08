@@ -152,7 +152,7 @@ class ProyectoDetalleScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar proyecto'),
-        content: Text(
+        content: const Text(
             'Se eliminará el proyecto y sus cotizaciones e items. ¿Continuar?'),
         actions: [
           TextButton(

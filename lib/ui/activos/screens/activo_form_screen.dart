@@ -3,8 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../data/models/abono_meta.dart';
 import '../../../data/models/asset.dart';
+import '../../../data/models/investment.dart';
 import '../../../data/providers/shared_providers.dart';
+import '../../../logic/activos/activos_logic.dart';
+import '../../metas/metas_providers.dart';
+import '../../prestamos_inversiones/prestamos_inversiones_providers.dart';
 
 class ActivoFormScreen extends ConsumerStatefulWidget {
   final Asset? asset;
@@ -23,6 +28,23 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
 
   String _tipoSeleccionado = 'cuenta_bancaria';
   String _monedaSeleccionada = 'COP';
+
+  /// Dinero de esta cuenta que está reservado en metas.
+  ///
+  /// El formulario es el único lugar donde el saldo de un activo se escribe a
+  /// mano, así que es también donde se valida que ese saldo siga cubriendo las
+  /// reservas existentes: si no, el Saldo Disponible quedaría negativo sin que
+  /// nadie lo hubiera decidido.
+  double get _reservado {
+    final registros =
+        ref.read(registrosDeMetasProvider).asData?.value ??
+        const <AbonoMeta>[];
+    final inversiones =
+        ref.read(inversionesStreamProvider).asData?.value ??
+        const <Investment>[];
+    return ActivosLogic.saldoReservadoEn(widget.asset?.id, registros) +
+        ActivosLogic.saldoReservadoInversionesEn(widget.asset?.id, inversiones);
+  }
 
   static const List<String> _tipos = [
     'cuenta_bancaria',
@@ -166,10 +188,23 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
                     controller: _montoController,
                     keyboardType: TextInputType.number,
                     inputFormatters: const [MilesInputFormatter()],
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Monto disponible *',
                       hintText: 'Ej. 3.000.000',
+                      helperMaxLines: 2,
+                      // Escribir el saldo a mano es la excepción, no la regla,
+                      // pero sigue siendo la forma más fácil de dejar la cuenta
+                      // descuadrada sin darse cuenta. Si hay reservas, se avisa de
+                      // que el campo es el Saldo Total y de que el disponible es
+                      // otro.
+                      helperText: _reservado > 0
+                          ? 'Es el saldo total de la cuenta. Tienes '
+                                '${AppFormat.moneda(_reservado)} reservados en '
+                                'metas, así que solo podrás gastar '
+                                '${AppFormat.moneda((milesADouble(_montoController.text) ?? 0) - _reservado)}.'
+                          : null,
                     ),
+                    onChanged: (_) => setState(() {}),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Requerido';
@@ -177,6 +212,13 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
                       final monto = milesADouble(value);
                       if (monto == null || monto <= 0) {
                         return 'Monto debe ser > 0';
+                      }
+                      // No se puede dejar el saldo total por debajo de lo que ya
+                      // está apartado: eso haría disponible negativo sin que
+                      // nadie haya autorizado ese negativo.
+                      if (monto < _reservado) {
+                        return 'Hay ${AppFormat.moneda(_reservado)} reservados '
+                            'en metas. El saldo no puede ser menor.';
                       }
                       return null;
                     },
@@ -195,8 +237,9 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
                             ))
                         .toList(),
                     onChanged: (value) {
-                      if (value != null)
+                      if (value != null) {
                         setState(() => _monedaSeleccionada = value);
+                      }
                     },
                   ),
                 ),

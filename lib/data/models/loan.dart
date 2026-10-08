@@ -11,6 +11,15 @@ class Loan {
   final double montoPagado;
   final DateTime fechaPrestamo;
   final DateTime fechaPagoEsperada;
+
+  /// Activo (cuenta) del que salió el dinero al prestar. Es obligatorio para
+  /// que el préstamo mueva saldo: sin cuenta no hay contra qué descontar ni
+  /// dónde devolver lo que el beneficiario reembolse.
+  ///
+  /// La FK va SIN cascada: si la cuenta se borra, el préstamo conserva todo su
+  /// historial y queda sin cuenta, en lugar de desaparecer sus movimientos.
+  final int? activoId;
+
   final String? condiciones;
   final String? observaciones;
   final String estado;
@@ -22,11 +31,24 @@ class Loan {
     'pagado_total',
   ];
 
+  /// Categoría del movimiento de salida: el dinero que salió de la cuenta al
+  /// prestar. Es un gasto porque el dinero efectivamente dejó el activo.
+  ///
+  /// No está en la lista de categorías de gasto del formulario de movimientos:
+  /// solo puede nacerse desde el módulo de préstamos, porque el movimiento es
+  /// lo que descuenta la cuenta y el préstamo lo que queda pendiente cobrar.
+  static const String categoriaPrestamo = 'prestamo';
+
+  /// Categoría del movimiento de entrada: lo que el beneficiario devolvió.
+  /// Por la misma razón que [categoriaPrestamo], se reserva para el módulo.
+  static const String categoriaReembolso = 'reembolso_prestamo';
+
   const Loan({
     this.id,
     required this.nombreBeneficiario,
     required this.montoPrestado,
     this.montoPagado = 0,
+    this.activoId,
     this.condiciones,
     this.observaciones,
     this.estado = 'pendiente',
@@ -43,12 +65,14 @@ class Loan {
       nombre_beneficiario TEXT NOT NULL,
       monto_prestado REAL NOT NULL,
       monto_pagado REAL NOT NULL DEFAULT 0,
+      activo_id INTEGER,
       fecha_prestamo TEXT NOT NULL,
       fecha_pago_esperada TEXT NOT NULL,
       condiciones TEXT,
       observaciones TEXT,
       estado TEXT NOT NULL DEFAULT 'pendiente',
-      fecha_creacion TEXT NOT NULL
+      fecha_creacion TEXT NOT NULL,
+      FOREIGN KEY (activo_id) REFERENCES activos(id) ON DELETE SET NULL
     )
   ''';
 
@@ -57,6 +81,7 @@ class Loan {
     String? nombreBeneficiario,
     double? montoPrestado,
     double? montoPagado,
+    int? activoId,
     DateTime? fechaPrestamo,
     DateTime? fechaPagoEsperada,
     String? condiciones,
@@ -69,6 +94,7 @@ class Loan {
       nombreBeneficiario: nombreBeneficiario ?? this.nombreBeneficiario,
       montoPrestado: montoPrestado ?? this.montoPrestado,
       montoPagado: montoPagado ?? this.montoPagado,
+      activoId: activoId ?? this.activoId,
       fechaPrestamo: fechaPrestamo ?? this.fechaPrestamo,
       fechaPagoEsperada: fechaPagoEsperada ?? this.fechaPagoEsperada,
       condiciones: condiciones ?? this.condiciones,
@@ -84,6 +110,7 @@ class Loan {
       'nombre_beneficiario': nombreBeneficiario,
       'monto_prestado': montoPrestado,
       'monto_pagado': montoPagado,
+      'activo_id': activoId,
       'fecha_prestamo': DateFormat('yyyy-MM-dd').format(fechaPrestamo),
       'fecha_pago_esperada':
           DateFormat('yyyy-MM-dd').format(fechaPagoEsperada),
@@ -100,6 +127,7 @@ class Loan {
       nombreBeneficiario: map['nombre_beneficiario'] as String,
       montoPrestado: (map['monto_prestado'] as num).toDouble(),
       montoPagado: (map['monto_pagado'] as num?)?.toDouble() ?? 0,
+      activoId: map['activo_id'] as int?,
       fechaPrestamo:
           DateFormat('yyyy-MM-dd').parse(map['fecha_prestamo'] as String),
       fechaPagoEsperada:

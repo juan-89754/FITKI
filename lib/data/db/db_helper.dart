@@ -1,10 +1,12 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
+import '../models/abono_meta.dart';
 import '../models/asset.dart';
 import '../models/transaction.dart';
 import '../models/financial_goal.dart';
 import '../models/loan.dart';
 import '../models/investment.dart';
+import '../models/inversion_movimiento.dart';
 import '../models/debt.dart';
 import '../models/quote_project.dart';
 import '../models/quote.dart';
@@ -23,7 +25,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 9;
+  static const int _dbVersion = 14;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -54,8 +56,10 @@ class DbHelper {
     batch.execute(Asset.createTableSQL);
     batch.execute(Transaction.createTableSQL);
     batch.execute(FinancialGoal.createTableSQL);
+    batch.execute(AbonoMeta.createTableSQL);
     batch.execute(Loan.createTableSQL);
     batch.execute(Investment.createTableSQL);
+    batch.execute(InversionMovimiento.createTableSQL);
     batch.execute(Debt.createTableSQL);
     batch.execute(QuoteProject.createTableSQL);
     batch.execute(Quote.createTableSQL);
@@ -130,6 +134,107 @@ class DbHelper {
       await db.execute(PagoGastoFijo.createTableSQL);
       await db.execute(PresupuestoActivo.createTableSQL);
     }
+    if (oldVersion < 10) {
+      // Los abonos a las metas pasan a ser registros con historia propia: cada
+      // aporte guarda de qué cuenta salió, cuándo y qué movimiento de gasto
+      // generó, para poder quitarlo después devolviendo el dinero. Antes solo
+      // se sumaba al acumulado de la meta, sin origen ni reversa posible.
+      await db.execute(AbonoMeta.createTableSQL);
+    }
+    if (oldVersion < 11) {
+      // Los préstamos a terceros se conectan con el dinero: el préstamo guarda
+      // de qué cuenta salió y cada movimiento que genera queda amarrado a él.
+      // Sin `prestamos.activo_id` no hay contra qué descontar lo prestado ni
+      // dónde devolver lo que se reembolse, que es justo lo que se perdía
+      // antes. `movimientos.prestamo_id` es lo que permite borrar el préstamo
+      // junto con sus movimientos devolviendo el dinero, sin adivinar a qué
+      // préstamo pertenece cada movimiento por su categoría o su nota.
+      await db.execute(
+        'ALTER TABLE prestamos ADD COLUMN activo_id INTEGER',
+      );
+      await db.execute(
+        'ALTER TABLE movimientos ADD COLUMN prestamo_id INTEGER',
+      );
+    }
+    if (oldVersion < 12) {
+      // Una meta es dinero que se puede meter y sacar en cualquier momento, así
+      // que sus registros dejan de ser solo aportes: cada fila dice si el dinero
+      // entró a la meta o salió de ella. Todas las filas existentes son aportes,
+      // de ahí el valor por defecto.
+      //
+      // `movimiento_id` queda en la tabla aunque ya no se use: un aporte a una
+      // meta no crea un movimiento, porque no mueve el saldo real de la cuenta,
+      // solo su disponibilidad. Y como las claves foráneas no están
+      // habilitadas, quitar la columna exigiría reescribir la tabla y con ella
+      // el historial de los aportes.
+
+      // `abonos_metas` es la única tabla que se crea dentro de una migración (el
+      // bloque v10) y no únicamente en `_onCreate`. Una instalación que viene de
+      // antes de la v10 recibe por tanto una tabla creada con el esquema actual,
+      // que ya trae `tipo`, y volver a añadir la columna aborta la migración con
+      // "duplicate column name", dejando la base sin abrir y la app muerta al
+      // arrancar. La migración tiene que servir igual a las bases que no tienen
+      // la columna y a las que nacieron en la v10 con ella ya incluida.
+      final columnasAbono = await db.rawQuery(
+        'PRAGMA table_info(${AbonoMeta.tableName})',
+      );
+      final yaTieneTipo = columnasAbono.any(
+        (columna) => columna['name'] == AbonoMeta.columnaTipo,
+      );
+      if (!yaTieneTipo) {
+        await db.execute(
+          'ALTER TABLE ${AbonoMeta.tableName} '
+          "ADD COLUMN tipo TEXT NOT NULL DEFAULT '${AbonoMeta.tipoAporte}'",
+        );
+      }
+
+      // Los abonos que la versión anterior sí descontaban de la cuenta dejaban el
+      // Saldo Total de los activos infracontabilizado, y sus movimientos de gasto
+      // seguían en `movimientos` como si el dinero se hubiera gastado. Se
+      // deshacen aquí: el dinero vuelve a su cuenta, sus movimientos se borran y
+      // el registro queda solo como aporto a la meta (tipo 'aporte', sin
+      // movimiento), que es exactamente lo que representa.
+      await db.execute('''
+        UPDATE activos SET monto_disponible = monto_disponible + COALESCE((
+          SELECT SUM(a.monto) FROM abonos_metas a
+          WHERE a.activo_id = activos.id AND a.movimiento_id IS NOT NULL
+        ), 0)
+      ''');
+      await db.execute('''
+        DELETE FROM movimientos WHERE id IN (
+          SELECT movimiento_id FROM abonos_metas WHERE movimiento_id IS NOT NULL
+        )
+      ''');
+      await db.execute(
+        'UPDATE abonos_metas SET movimiento_id = NULL WHERE movimiento_id IS NOT NULL',
+      );
+    }
+    if (oldVersion < 13) {
+      await db.execute(
+        'ALTER TABLE ${Transaction.tableName} ADD COLUMN comprobante_path TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE ${Transaction.tableName} ADD COLUMN comprobante_nombre TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE ${Transaction.tableName} ADD COLUMN comprobante_mime_type TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE ${Transaction.tableName} ADD COLUMN comprobante_size_bytes INTEGER',
+      );
+    }
+    if (oldVersion < 14) {
+      // Las inversiones pasan a comportarse como las metas: su dinero se liga a
+      // una cuenta de origen y se reserva desde ella. `activo_id` es esa cuenta
+      // y `estado` distingue una inversión abierta de una ya finalizada, cuando
+      // el resultado se registra en el historial de movimientos.
+      await db.execute('ALTER TABLE inversiones ADD COLUMN activo_id INTEGER');
+      await db.execute(
+        "ALTER TABLE inversiones ADD COLUMN estado TEXT NOT NULL DEFAULT 'activa'",
+      );
+      // Historial de aportes, retiros, ganancias y pérdidas de cada inversión.
+      await db.execute(InversionMovimiento.createTableSQL);
+    }
   }
 
   Future<void> close() async {
@@ -150,8 +255,10 @@ class DbHelper {
       Asset.tableName,
       Transaction.tableName,
       FinancialGoal.tableName,
+      AbonoMeta.tableName,
       Loan.tableName,
       Investment.tableName,
+      InversionMovimiento.tableName,
       Debt.tableName,
       QuoteProject.tableName,
       Quote.tableName,

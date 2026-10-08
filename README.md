@@ -55,6 +55,13 @@ Módulo para llevar el control de los movimientos diarios de dinero.
 - Validaciones: el nombre es obligatorio y el monto objetivo, si se informa, debe ser válido.
 - Cálculos: monto restante, porcentaje de avance (limitado entre 0 y 100), semanas y meses restantes, y sugerencia de cuánto ahorrar por semana y por mes según el tiempo disponible.
 
+**Abonos a las metas**
+- Cada abono es un gasto de la cuenta elegida, con la categoría propia *Ahorro en metas*: descuenta el saldo del activo y queda en el historial de movimientos, pero no se confunde con un gasto consumido porque se puede quitar.
+- Registrar un abono escribe tres cosas en una sola transacción: el movimiento, el descuento del activo y el avance de la meta. O queda todo o no queda nada.
+- El detalle de la meta lista sus abonos (fecha, cuenta de origen y monto) y cada uno se quita por separado: el movimiento se borra, el dinero vuelve a la cuenta y la meta deja de sumar ese monto.
+- Borrar la meta devuelve a las cuentas todo lo que se le había abonado, previa confirmación del total.
+- El movimiento de un abono no se edita ni se borra desde la lista de movimientos: su vida es la del abono, que es lo que mantiene sincronizados el saldo y el avance de la meta.
+
 > Las sugerencias se calculan con fórmulas deterministas (monto de la meta dividido entre el tiempo restante); no son recomendaciones generadas por un modelo de IA.
 
 ### Gestión de préstamos a terceros e inversiones
@@ -203,9 +210,9 @@ Plataformas con scaffolding en el repositorio: Android, iOS, Web, Windows, macOS
 
 ## Base de datos
 
-Archivo único `fitki.db` con 14 tablas: `activos`, `movimientos`, `metas_financieras`, `prestamos`, `inversiones`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `presupuestos`, `gastos_presupuestados`, `gastos_diarios`, `categorias_personalizadas` y `perfil`.
+Archivo único `fitki.db` con 15 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `gastos_fijos`, `pagos_gastos_fijos`, `presupuestos_activo`, `categorias_personalizadas` y `perfil`.
 
-El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 8), de modo que las instalaciones existentes se actualizan sin perder datos.
+El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 10), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
 
 ## Pruebas
 

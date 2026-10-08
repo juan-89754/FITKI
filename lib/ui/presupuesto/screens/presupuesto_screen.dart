@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../data/models/asset.dart';
-import '../../../data/providers/shared_providers.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../activos/activos_providers.dart';
 import 'gasto_fijo_form_screen.dart';
 import 'presupuesto_activo_form_screen.dart';
 import '../widgets/gastos_fijos_tab.dart';
@@ -59,7 +58,7 @@ class _PresupuestoScreenState extends ConsumerState<PresupuestoScreen>
     }
 
     final activos =
-        ref.read(activosStreamProvider).asData?.value ?? const <Asset>[];
+        ref.read(activosConSaldoProvider);
     if (activos.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,13 +74,18 @@ class _PresupuestoScreenState extends ConsumerState<PresupuestoScreen>
     if (activo == null || !mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PresupuestoActivoFormScreen(activo: activo),
+        builder: (_) => PresupuestoActivoFormScreen(activo: activo.activo),
       ),
     );
   }
 
-  Future<Asset?> _elegirActivo(List<Asset> activos) async {
-    return showModalBottomSheet<Asset>(
+  /// Pide la cuenta del presupuesto.
+  ///
+  /// Muestra el Saldo **Disponible** y no el total: es contra ese número contra el
+  /// que se valida el límite, así que mostrar otro dejaría al usuario comparando
+  /// el límite con una cifra que la app no le va a dejar alcanzar.
+  Future<ActivoConSaldo?> _elegirActivo(List<ActivoConSaldo> activos) async {
+    return showModalBottomSheet<ActivoConSaldo>(
       context: context,
       backgroundColor: AppColors.surface,
       builder: (ctx) => SafeArea(
@@ -103,8 +107,17 @@ class _PresupuestoScreenState extends ConsumerState<PresupuestoScreen>
                 (a) => ListTile(
                   leading: const Icon(Icons.account_balance_rounded),
                   title: Text(a.nombre),
+                  subtitle: a.reservado > 0
+                      ? Text(
+                          '${AppFormat.moneda(a.reservado)} reservados en metas',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        )
+                      : null,
                   trailing: Text(
-                    AppFormat.moneda(a.montoDisponible),
+                    AppFormat.moneda(a.saldoDisponible),
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

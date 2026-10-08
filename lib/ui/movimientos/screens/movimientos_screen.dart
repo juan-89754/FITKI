@@ -8,9 +8,11 @@ import '../../../data/models/asset.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../../../logic/movimientos/movimientos_logic.dart';
 import '../../../data/providers/shared_providers.dart';
+import '../../../data/storage/comprobante_storage.dart';
 import '../movimientos_providers.dart';
 import '../../home/tab_navigation.dart';
 import 'movimiento_form_screen.dart';
+import 'movimiento_detalle_screen.dart';
 
 class MovimientosScreen extends ConsumerStatefulWidget {
   const MovimientosScreen({super.key});
@@ -69,8 +71,11 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
                                 return _MovimientoCard(
                                   movimiento: movimiento,
                                   asset: _buscarActivo(activos, movimiento.activoId),
-                                  onTap: () =>
-                                      _abrirFormulario(context, movimiento: movimiento),
+                                  onTap: () => _verDetalle(
+                                    context,
+                                    movimiento: movimiento,
+                                    asset: _buscarActivo(activos, movimiento.activoId),
+                                  ),
                                   onEliminar: () =>
                                       _confirmarEliminar(context, movimiento),
                                 );
@@ -147,7 +152,68 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
     return null;
   }
 
+  bool _puedeEditar(Transaction? movimiento) {
+    if (movimiento == null) return true;
+    if (movimiento.categoria == categoriaAhorroMeta ||
+        movimiento.prestamoId != null) {
+      return false;
+    }
+    return true;
+  }
+
+  void _verDetalle(
+    BuildContext context, {
+    required Transaction movimiento,
+    Asset? asset,
+  }) {
+    Navigator.of(context)
+        .push(
+      MaterialPageRoute(
+        builder: (_) => MovimientoDetalleScreen(
+          movimiento: movimiento,
+          asset: asset,
+        ),
+      ),
+    )
+        .then((accion) {
+      if (accion == 'editar') {
+        if (!_puedeEditar(movimiento)) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                movimiento.categoria == categoriaAhorroMeta
+                    ? 'Los abonos a metas se cambian desde la propia meta'
+                    : 'Los movimientos de un pr�stamo se cambian desde el pr�stamo',
+              ),
+            ),
+          );
+          return;
+        }
+        if (context.mounted) {
+          _abrirFormulario(context, movimiento: movimiento);
+        }
+      } else if (accion == 'eliminar') {
+        if (context.mounted) {
+          _confirmarEliminar(context, movimiento);
+        }
+      }
+    });
+  }
+
   void _abrirFormulario(BuildContext context, {Transaction? movimiento}) {
+    if (!_puedeEditar(movimiento)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            movimiento != null && movimiento.categoria == categoriaAhorroMeta
+                ? 'Los abonos a metas se cambian desde la propia meta'
+                : 'Los movimientos de un prǸstamo se cambian desde el prǸstamo',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context)
         .push(
       MaterialPageRoute(
@@ -163,6 +229,18 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
   }
 
   void _confirmarEliminar(BuildContext context, Transaction movimiento) {
+    if (movimiento.prestamoId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Los movimientos de un préstamo se quitan desde el préstamo, '
+            'para devolver el dinero a la cuenta',
+          ),
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -184,6 +262,8 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
                 await ref
                     .read(movimientoRepositoryProvider)
                     .delete(movimiento.id!);
+                await ComprobanteStorage()
+                    .limpiarSiOrfano(movimiento.comprobantePath);
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -370,6 +450,18 @@ class _MovimientoCard extends StatelessWidget {
   bool get _esIngreso => movimiento.tipo == 'ingreso';
   Color get _color => _esIngreso ? AppColors.primary : AppColors.coral;
 
+  /// Un abono a una meta es un movimiento derivado: existe porque hay un abono
+  /// que descuenta la cuenta y avanza la meta. Por eso acá no se ofrece ni
+  /// editarlo ni borrarlo (eso dejaría el saldo y la meta descuadrados); su
+  /// como el dinero sale de la cuenta y avanza la meta a la vez.
+  bool get _esAbonoMeta => movimiento.categoria == categoriaAhorroMeta;
+
+  /// Un movimiento de un préstamo (el dinero que salió al prestar o el
+  /// reembolso que entró) tampoco se edita ni se borra desde acá: su vida es la
+  /// del préstamo, que es lo que mantiene el saldo de la cuenta y lo cobrado
+  /// alineados.
+  bool get _esDePrestamo => movimiento.prestamoId != null;
+
   void _mostrarOpciones(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -391,31 +483,66 @@ class _MovimientoCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.edit_rounded),
-                title: const Text('Editar'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              if (_esAbonoMeta)
+                ListTile(
+                  leading: const Icon(Icons.savings_rounded),
+                  title: const Text('Ir a Metas'),
+                  subtitle: const Text(
+                    'Los abonos a metas se quitan desde la propia meta, '
+                    'devolviendo el dinero a su cuenta',
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    irAModulo(context, TabIndex.metas);
+                  },
+                )
+              else if (_esDePrestamo)
+                ListTile(
+                  leading: const Icon(Icons.handshake_rounded),
+                  title: const Text('Ir a Préstamos'),
+                  subtitle: const Text(
+                    'Los movimientos de un préstamo se cambian o se quitan '
+                    'desde el préstamo, que es lo que mantiene el saldo de la '
+                    'cuenta y lo cobrado alineados',
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    irAModulo(context, TabIndex.prestamos);
+                  },
+                )
+              else ...[
+                ListTile(
+                  leading: const Icon(Icons.edit_rounded),
+                  title: const Text('Editar'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onTap();
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onTap();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline_rounded),
-                title: const Text(
-                  'Eliminar',
-                  style: TextStyle(color: AppColors.coral),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text(
+                    'Eliminar',
+                    style: TextStyle(color: AppColors.coral),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onEliminar();
+                  },
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onEliminar();
-                },
-              ),
+              ],
             ],
           ),
         ),
@@ -469,16 +596,26 @@ class _MovimientoCard extends StatelessWidget {
                         labelCategoria(movimiento.categoria),
                         style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 15),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
-                        [
-                          fechaFormateada,
-                          if (asset != null) ' · ${asset!.nombre}',
-                        ].join(),
+                        fechaFormateada,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall!,
+                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                       ),
+                      if (asset != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          asset!.nombre,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

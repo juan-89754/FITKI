@@ -292,7 +292,7 @@ class _PieGastos extends StatelessWidget {
     const currency = AppFormat.moneda;
 
     if (gastos.isEmpty) {
-      return _SinDatos(mensaje: 'Sin gastos registrados este mes');
+      return const _SinDatos(mensaje: 'Sin gastos registrados este mes');
     }
 
     return Column(
@@ -364,7 +364,7 @@ class _LineEvolucion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (puntos.length < 2) {
-      return _SinDatos(mensaje: 'Datos insuficientes para la evolución');
+      return const _SinDatos(mensaje: 'Datos insuficientes para la evolución');
     }
 
     final valores = puntos.map((p) => p.valor);
@@ -490,7 +490,7 @@ class _BarrasDeudasVsIngresos extends StatelessWidget {
         ? datos.ingresosMes
         : datos.totalDeudasPendientes;
     if (maxValor <= 0) {
-      return _SinDatos(
+      return const _SinDatos(
         mensaje: 'Registra ingresos o deudas para comparar',
       );
     }

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
+import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../data/providers/shared_providers.dart';
 
@@ -26,6 +28,11 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
   late DateTime _fechaPrestamo;
   late DateTime _fechaPagoEsperada;
 
+  /// Cuenta de la que sale el dinero al prestar. Es obligatoria: sin ella el
+  /// repositorio no tiene contra qué descontar el monto, y el préstamo
+  /// quedaría sin relación con el patrimonio.
+  int? _activoId;
+
   bool get _editando => widget.prestamo != null;
 
   @override
@@ -43,6 +50,7 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
       _observacionesController.text = prestamo.observaciones ?? '';
       _fechaPrestamo = prestamo.fechaPrestamo;
       _fechaPagoEsperada = prestamo.fechaPagoEsperada;
+      _activoId = prestamo.activoId;
     }
   }
 
@@ -58,6 +66,7 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
   @override
   Widget build(BuildContext context) {
     final fechaInvalida = _fechaPagoEsperada.isBefore(_fechaPrestamo);
+    final activosAsync = ref.watch(activosStreamProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -107,6 +116,20 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              activosAsync.when(
+                data: (activos) => _campoActivo(activos),
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Text(
+                  'Error cargando activos: $e',
+                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                    color: AppColors.coral,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               _campoFecha(
@@ -179,6 +202,53 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
         ),
       ),
     );
+  }
+
+  Widget _campoActivo(List<Asset> activos) {
+    if (activos.isEmpty) {
+      return const _AvisoRequerimiento(
+        texto:
+            'Necesitas una cuenta o activo para registrar el préstamo. El monto '
+            'sale de esa cuenta y los reembolsos vuelven a ella.',
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<int>(
+          initialValue: _activoId != null && activos.any((a) => a.id == _activoId)
+              ? _activoId
+              : null,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Cuenta de origen *'),
+          items: [
+            for (final activo in activos)
+              DropdownMenuItem<int>(
+                value: activo.id,
+                child: Text(
+                  '${activo.nombre} · ${_formatearSaldo(activo)}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (value) => setState(() => _activoId = value),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            'El monto se descontará de esta cuenta y los reembolsos del '
+            'beneficiario volverán a ella.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatearSaldo(Asset asset) {
+    final symbol = asset.moneda == 'USD' ? r'US$' : r'$';
+    return AppFormat.moneda(asset.montoDisponible, symbol: symbol);
   }
 
   Widget _campoFecha({
@@ -272,6 +342,18 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
       return;
     }
 
+    // El préstamo siempre sale de una cuenta. Si el campo quedó vacío se
+    // pregunta cuál: es la misma regla que aplica a todo gasto de la app.
+    final activoId = await resolverActivoDeGasto(
+      context,
+      activos: ref.read(activosStreamProvider).asData?.value ?? const <Asset>[],
+      actual: _activoId,
+      mensajeSinActivos: 'Crea primero una cuenta o activo para registrar el '
+          'préstamo: el monto sale de esa cuenta y los reembolsos vuelven a '
+          'ella.',
+    );
+    if (activoId == null) return;
+
     final prestamoActual = widget.prestamo;
     final monto = milesADouble(_montoController.text) ?? 0;
 
@@ -280,6 +362,7 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
       nombreBeneficiario: _beneficiarioController.text.trim(),
       montoPrestado: monto,
       montoPagado: prestamoActual?.montoPagado ?? 0,
+      activoId: activoId,
       fechaPrestamo: _fechaPrestamo,
       fechaPagoEsperada: _fechaPagoEsperada,
       condiciones: _condicionesController.text.trim().isEmpty
@@ -294,16 +377,16 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
 
     final repo = ref.read(prestamoRepositoryProvider);
     try {
-      if (_editando) {
-        await repo.update(prestamo);
+      if (prestamoActual != null) {
+        await repo.actualizarConAjuste(original: prestamoActual, nuevo: prestamo);
       } else {
         await repo.insert(prestamo);
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
+          SnackBar(
+            content: Text(_mensajeDeError(e)),
           ),
         );
       }
@@ -311,5 +394,56 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
     }
 
     if (mounted) Navigator.pop(context, true);
+  }
+
+  /// Traduce a lenguaje llano los fallos que el repositorio usa para impedir
+  /// un estado imposible, en vez de mostrar siempre un error genérico.
+  String _mensajeDeError(Object error) {
+    final mensaje = error.toString();
+    if (mensaje.contains('ya reembolsado')) {
+      return 'El monto no puede ser menor a lo ya reembolsado '
+          '(${AppFormat.moneda(widget.prestamo!.montoPagado)})';
+    }
+    return 'No se pudo guardar, intenta de nuevo';
+  }
+}
+
+/// Avisoinline que sustituye a un campo cuando falta un requisito previo
+/// (por ejemplo, no hay ninguna cuenta creada todavía).
+class _AvisoRequerimiento extends StatelessWidget {
+  final String texto;
+
+  const _AvisoRequerimiento({required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.coral.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.coral,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              texto,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall!
+                  .copyWith(color: AppColors.coral),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

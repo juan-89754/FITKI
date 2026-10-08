@@ -6,10 +6,13 @@ import 'package:fitki/main.dart';
 import 'package:fitki/data/models/asset.dart';
 import 'package:fitki/data/models/debt.dart';
 import 'package:fitki/data/models/financial_goal.dart';
+import 'package:fitki/data/models/abono_meta.dart';
+import 'package:fitki/data/models/investment.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/data/providers/shared_providers.dart';
 import 'package:fitki/ui/deudas/deudas_providers.dart';
 import 'package:fitki/ui/metas/metas_providers.dart';
+import 'package:fitki/ui/prestamos_inversiones/prestamos_inversiones_providers.dart';
 import 'package:fitki/ui/movimientos/movimientos_providers.dart';
 
 void main() {
@@ -36,6 +39,15 @@ void main() {
             perfilStreamProvider.overrideWith(
               (ref) => Stream.value(null),
             ),
+            // El encabezado calcula el disponible, que descuenta lo reservado en
+            // metas. Sin este override el test cierra con timers de sqflite
+            // pendientes, porque esa promesa nunca termina en `flutter test`.
+            registrosDeMetasProvider.overrideWith(
+              (ref) => Stream.value(const <AbonoMeta>[]),
+            ),
+            inversionesStreamProvider.overrideWith(
+              (ref) => Stream.value(const <Investment>[]),
+            ),
           ],
           child: const FitkiApp(),
         ),
@@ -46,7 +58,13 @@ void main() {
         find.text('Este es el panorama de tus finanzas.'),
         findsOneWidget,
       );
-      expect(find.text('PATRIMONIO TOTAL'), findsOneWidget);
+      // El encabezado muestra el disponible como número principal y el patrimonio
+      // total aparte: la pregunta del home es cuánto hay para gastar, y el
+      // dinero apartado en metas no lo es aunque siga siendo tuyo.
+      expect(find.text('DISPONIBLE PARA GASTAR'), findsOneWidget);
+      expect(find.text('Patrimonio total'), findsOneWidget);
+      expect(find.text('Reservado en metas'), findsOneWidget);
+      expect(find.text('PATRIMONIO TOTAL'), findsNothing);
 
       // Fitki no tiene pantalla de bloqueo: la app entra directa al inicio, sin
       // pedir PIN ni biometría ni al arrancar ni al volver de segundo plano.
@@ -79,6 +97,14 @@ void main() {
               (ref) => Stream.value(const <Debt>[]),
             ),
             perfilStreamProvider.overrideWith((ref) => Stream.value(null)),
+            // Ver el smoke test de arriba: el disponible del encabezado lee los
+            // registros de las metas.
+            registrosDeMetasProvider.overrideWith(
+              (ref) => Stream.value(const <AbonoMeta>[]),
+            ),
+            inversionesStreamProvider.overrideWith(
+              (ref) => Stream.value(const <Investment>[]),
+            ),
           ],
           child: const FitkiApp(),
         ),

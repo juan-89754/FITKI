@@ -7,6 +7,7 @@ import '../../../logic/activos/activos_logic.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../activos_providers.dart';
 import '../../home/tab_navigation.dart';
+import '../../metas/metas_providers.dart';
 import 'activo_form_screen.dart';
 
 class ActivosScreen extends ConsumerWidget {
@@ -38,7 +39,11 @@ class ActivosScreen extends ConsumerWidget {
     }
   }
 
-  String _formatearMonto(double monto, String moneda) {
+/// Formatea un monto con el símbolo de su moneda.
+  ///
+  /// Es `static` porque la necesitan tanto la cabecera como las tarjetas, y
+  /// duplicarlo haría que dos vistas del mismo número se mostraran distinto.
+  static String _formatearMonto(double monto, String moneda) {
     final symbol = moneda == 'USD' ? 'US\$' : '\$';
     return AppFormat.moneda(monto, symbol: symbol);
   }
@@ -91,7 +96,8 @@ class ActivosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final patrimonioAsync = ref.watch(patrimonioProvider);
     final patrimonioTotalAsync = ref.watch(patrimonioTotalProvider);
-    final activosAsync = ref.watch(activosStreamProvider);
+    final disponiblesAsync = ref.watch(patrimonioDisponibleTotalProvider);
+    final activosAsync = ref.watch(activosConSaldoProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -105,45 +111,39 @@ class ActivosScreen extends ConsumerWidget {
           _PatrimonioHeader(
             patrimonioPorMoneda: patrimonioAsync,
             patrimonioTotal: patrimonioTotalAsync,
+            disponibleTotal: disponiblesAsync,
+            hayReservas: ref.watch(registrosDeMetasProvider).asData?.value
+                .any((r) => r.montoConSigno != 0) ?? false,
           ),
           Expanded(
-            child: activosAsync.when(
-              data: (activos) {
-                if (activos.isEmpty) {
-                  return _EstadoVacio(
-                    onAgregar: () => _abrirFormulario(context, ref),
-                  );
-                }
-                return ListView.separated(
-                  controller: ref.read(
-                    tabScrollControllersProvider,
-                  )[TabIndex.activos],
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  itemCount: activos.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, index) {
-                    final asset = activos[index];
-                    return _ActivoCard(
-                      asset: asset,
-                      icono: _iconoParaTipo(asset.tipo),
-                      labelTipo: _labelTipo(asset.tipo),
-                      montoFormateado: _formatearMonto(asset.montoDisponible, asset.moneda),
-                      onTap: () => _abrirFormulario(context, ref, asset: asset),
-                      onEliminar: () => _confirmarEliminar(context, ref, asset),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text(
-                  'Error al cargar activos: $e',
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: AppColors.coral,
+            child: activosAsync.isEmpty
+                ? _EstadoVacio(onAgregar: () => _abrirFormulario(context, ref))
+                : ListView.separated(
+                    controller: ref.read(
+                      tabScrollControllersProvider,
+                    )[TabIndex.activos],
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    itemCount: activosAsync.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, index) {
+                      final activo = activosAsync[index];
+                      return _ActivoCard(
+                        activo: activo,
+                        icono: _iconoParaTipo(activo.activo.tipo),
+                        labelTipo: _labelTipo(activo.activo.tipo),
+                        onTap: () => _abrirFormulario(
+                          context,
+                          ref,
+                          asset: activo.activo,
+                        ),
+                        onEliminar: () => _confirmarEliminar(
+                          context,
+                          ref,
+                          activo.activo,
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -161,10 +161,14 @@ class ActivosScreen extends ConsumerWidget {
 class _PatrimonioHeader extends StatelessWidget {
   final List<PatrimonioPorMoneda> patrimonioPorMoneda;
   final double patrimonioTotal;
+  final double disponibleTotal;
+  final bool hayReservas;
 
   const _PatrimonioHeader({
     required this.patrimonioPorMoneda,
     required this.patrimonioTotal,
+    required this.disponibleTotal,
+    required this.hayReservas,
   });
 
   @override
@@ -174,7 +178,7 @@ class _PatrimonioHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
@@ -218,6 +222,41 @@ class _PatrimonioHeader extends StatelessWidget {
                   ),
                 );
               }).toList(),
+            ),
+          ],
+          // El patrimonio de arriba es la suma de los saldos totales: cuenta
+          // también el dinero apartado en metas. Este es el único número que
+          // responde "¿cuánto puedo gastar?", y por eso solo aparece cuando hay
+          // reservas: si no hay, disponible y total serían el mismo número dos
+          // veces.
+          if (hayReservas) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.textOnPrimary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 16,
+                    color: AppColors.textOnPrimary.withValues(alpha: 0.9),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${AppFormat.moneda(patrimonioTotal - disponibleTotal)} '
+                    'reservados en metas · '
+                    '${AppFormat.moneda(disponibleTotal)} disponibles',
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textOnPrimary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -282,24 +321,34 @@ class _EstadoVacio extends StatelessWidget {
 }
 
 class _ActivoCard extends StatelessWidget {
-  final Asset asset;
+  final ActivoConSaldo activo;
   final IconData icono;
   final String labelTipo;
-  final String montoFormateado;
   final VoidCallback onTap;
   final VoidCallback onEliminar;
 
   const _ActivoCard({
-    required this.asset,
+    required this.activo,
     required this.icono,
     required this.labelTipo,
-    required this.montoFormateado,
     required this.onTap,
     required this.onEliminar,
   });
 
   @override
   Widget build(BuildContext context) {
+    final asset = activo.activo;
+
+    // Solo tiene sentido desglosar cuando hay algo reservado: si no, mostrar
+    // "disponible $X" repetido bajo un total de $X solo agrega ruido.
+    final hayReserva = activo.reservado > 0 || activo.reservadoInversiones > 0;
+    final reservaTexto = [
+      if (activo.reservado > 0)
+        '${ActivosScreen._formatearMonto(activo.reservado, activo.moneda)} en metas',
+      if (activo.reservadoInversiones > 0)
+        '${ActivosScreen._formatearMonto(activo.reservadoInversiones, activo.moneda)} en inversiones',
+    ].join(' · ');
+
     return Card(
       elevation: 0,
       color: AppColors.surface,
@@ -334,7 +383,11 @@ class _ActivoCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      labelTipo,
+                      hayReserva
+                          ? '$labelTipo · $reservaTexto'
+                          : labelTipo,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall!.copyWith(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -343,9 +396,27 @@ class _ActivoCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                montoFormateado,
-                style: Theme.of(context).textTheme.titleMedium!.copyWith(color: AppColors.primary),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    ActivosScreen._formatearMonto(
+                      hayReserva ? activo.saldoDisponible : activo.saldoTotal,
+                      activo.moneda,
+                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium!.copyWith(color: AppColors.primary),
+                  ),
+                  if (hayReserva)
+                    Text(
+                      'de ${ActivosScreen._formatearMonto(activo.saldoTotal, activo.moneda)}',
+                      style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 8),
               PopupMenuButton<String>(

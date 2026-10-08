@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/categoria_personalizada.dart';
+import '../../data/models/loan.dart';
 
 /// Categorías de GASTO predefinidas (slugs internos que se guardan en los
 /// movimientos y presupuestos). Fuente única de la lista fija que presentan
@@ -18,6 +19,29 @@ const List<String> categoriasGasto = [
   'pagos',
   'otro',
 ];
+
+/// Categoría que usaba la app para el movimiento de un abono a una meta. Ya no
+/// se escribe: un aporte no mueve el saldo de la cuenta, así que no genera
+/// movimiento (ver `AbonoMeta`). El valor literal se conserva para que los
+/// respaldos creados con la versión anterior, donde sí había esos movimientos,
+/// se sigan mostrando como "Ahorro en metas" y no como un slug crudo.
+const String categoriaAhorroMeta = 'ahorro_meta';
+
+/// Categoría del movimiento que registra el dinero que salió de la cuenta al
+/// prestar (ver `Loan`). Reservada: solo nace del módulo de préstamos, porque el
+/// movimiento descuenta la cuenta y el préstamo es lo que queda pendiente cobrar.
+const String categoriaPrestamo = Loan.categoriaPrestamo;
+
+/// Categoría del movimiento que registra lo que el beneficiario devolvió.
+const String categoriaReembolsoPrestamo = Loan.categoriaReembolso;
+
+/// Movimiento que nace al finalizar una inversión con resultado positivo: el
+/// dinero ganado entra a la cuenta como ingreso.
+const String categoriaGananciaInversion = 'ganancia_inversion';
+
+/// Movimiento que nace al finalizar una inversión con resultado negativo: la
+/// pérdida sale de la cuenta como gasto.
+const String categoriaPerdidaInversion = 'perdida_inversion';
 
 /// Categorías de INGRESO predefinidas (slugs internos). Fuente única de la
 /// lista fija que presenta el dropdown de categoría de ingreso.
@@ -63,6 +87,11 @@ final Map<String, String> _categoriaLabels = {
   'tecnologia': 'Tecnología',
   'pagos': 'Pagos de deuda',
   'otro': 'Otro',
+  categoriaAhorroMeta: 'Ahorro en metas',
+  categoriaPrestamo: 'Préstamo a terceros',
+  categoriaReembolsoPrestamo: 'Reembolso de préstamo',
+  categoriaGananciaInversion: 'Ganancia de inversión',
+  categoriaPerdidaInversion: 'Pérdida de inversión',
   categoriaEliminada: 'Categoría eliminada',
 };
 
@@ -82,7 +111,12 @@ final Map<String, IconData> _categoriaIconos = {
   'ventas': Icons.point_of_sale_rounded,
   'inversiones': Icons.trending_up_rounded,
   'regalos': Icons.card_giftcard_rounded,
-  'otro': Icons.category_rounded,
+categoriaAhorroMeta: Icons.savings_rounded,
+categoriaPrestamo: Icons.handshake_rounded,
+categoriaReembolsoPrestamo: Icons.call_received_rounded,
+categoriaGananciaInversion: Icons.trending_up_rounded,
+categoriaPerdidaInversion: Icons.trending_down_rounded,
+'otro': Icons.category_rounded,
   categoriaEliminada: Icons.delete_outline_rounded,
 };
 

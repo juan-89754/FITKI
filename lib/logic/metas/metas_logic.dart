@@ -1,7 +1,11 @@
+import '../../data/models/abono_meta.dart';
 import '../../data/models/financial_goal.dart';
 
 class MetaCalculo {
   final FinancialGoal meta;
+
+  /// Dinero actualmente apartado en la meta (Σ aportes − Σ retiros).
+  final double saldo;
 
   /// Cuánto falta ahorrar en total. `null` si la meta no tiene objetivo fijo.
   final double? montoFaltante;
@@ -23,6 +27,7 @@ class MetaCalculo {
 
   const MetaCalculo({
     required this.meta,
+    required this.saldo,
     required this.montoFaltante,
     required this.porcentajeProgreso,
     required this.semanasRestantes,
@@ -33,15 +38,55 @@ class MetaCalculo {
 }
 
 class MetasLogic {
-  static MetaCalculo calcular(FinancialGoal meta) {
+  /// Saldo de una meta: la suma con signo de sus registros (Σ aportes −
+  /// Σ retiros).
+  ///
+  /// Es la única forma de obtener el saldo. El valor guardado en
+  /// `FinancialGoal.montoAhorrado` es una copia que el repositorio refresca en
+  /// la misma transacción que escribe cada registro, y se usa solo cuando la
+  /// pantalla aún no tiene el historial a la vista.
+  static double saldoDeMeta(List<AbonoMeta> registros) {
+    double saldo = 0;
+    for (final registro in registros) {
+      saldo += registro.montoConSigno;
+    }
+    return saldo;
+  }
+
+  /// Dinero de una meta que está reservado en [activoId]: sirve para validar un
+  /// retiro sin consultar la base.
+  static double reservadoEnActivo(
+    List<AbonoMeta> registros,
+    int? activoId,
+  ) {
+    if (activoId == null) return 0;
+    double reservado = 0;
+    for (final registro in registros) {
+      if (registro.activoId == activoId) {
+        reservado += registro.montoConSigno;
+      }
+    }
+    return reservado;
+  }
+
+  /// Calcula el avance de la meta.
+  ///
+  /// Si se pasan los registros, el saldo sale de ellos ([saldoDeMeta]); si no,
+  /// se usa el acumulado guardado. El resto de los cálculos depende solo del
+  /// saldo y del objetivo, así que son idénticos en ambos caminos.
+  static MetaCalculo calcular(
+    FinancialGoal meta, {
+    List<AbonoMeta>? registros,
+  }) {
     final objetivo = meta.montoObjetivo;
+    final saldo = registros == null ? meta.montoAhorrado : saldoDeMeta(registros);
 
     final montoFaltante = objetivo != null
-        ? (objetivo - meta.montoAhorrado).clamp(0.0, double.infinity)
+        ? (objetivo - saldo).clamp(0.0, double.infinity)
         : null;
 
     final porcentaje = (objetivo != null && objetivo > 0)
-        ? (meta.montoAhorrado / objetivo).clamp(0.0, 1.0) * 100
+        ? (saldo / objetivo).clamp(0.0, 1.0) * 100
         : 0.0;
 
     final semanas = _semanasRestantes(meta.fechaEstimada);
@@ -56,6 +101,7 @@ class MetasLogic {
 
     return MetaCalculo(
       meta: meta,
+      saldo: saldo,
       montoFaltante: montoFaltante,
       porcentajeProgreso: porcentaje,
       semanasRestantes: semanas,

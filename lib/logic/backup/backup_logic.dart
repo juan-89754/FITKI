@@ -16,10 +16,12 @@ import '../../data/db/db_helper.dart';
 /// mediante el callback [onRestaurado].
 ///
 /// GARANTÍA DE INTEGRIDAD AL RESTAURAR:
-///  - Se valida ANTES de tocar la base real que el archivo elegido tenga
-///    TODAS las tablas de Fitki (consulta a sqlite_master en modo solo
-///    lectura, conexión aparte). Un archivo que no lo cumpla se rechaza sin
-///    modificar nada.
+///  - Se valida ANTES de tocar la base real que el archivo elegido tenga el
+///    esquema de Fitki (consulta a sqlite_master en modo solo lectura, conexión
+///    aparte). Un archivo que no lo cumpla se rechaza sin modificar nada. La
+///    validación previa exige el núcleo de tablas (las que tiene cualquier
+///    backup de Fitki, por antiguo que sea); las que agregar una versión nueva
+///    se exigen sobre la base ya migrada, y la migración se encarga de crearlas.
 ///  - Durante el reemplazo se conserva una copia de la base actual en un
 ///    archivo temporal. Ante cualquier fallo a mitad de camino (copias,
 ///    reapertura o verificación posterior) se REVIERTE la base real desde esa
@@ -36,9 +38,16 @@ class RestauracionRevertidaException implements Exception {
   String toString() => mensajeUsuario;
 }
 
-/// Todas las tablas que crea [DbHelper] al inicializar. Mantener en
-/// sincronía con `_onCreate`/`_onUpgrade` de db_helper.dart.
-const Set<String> _tablasFitki = {
+/// Tablas que ya existían antes de que la app empezara a agregar tablas nuevas.
+/// Un archivo solo se acepta como backup de Fitki si trae TODAS estas: son las
+/// que identifican el esquema y las que un backup antiguo también tiene.
+///
+/// Las tablas de [_tablasAgregadas] NO se exigen en el archivo, porque un backup
+/// tomado antes de que existieran válidamente no las trae. Se crean solas al
+/// reabrir la base restaurada, que es cuando corren las migraciones; por eso
+/// [_esquemaCompletoYLegible], que sí se ejecuta sobre la base ya migrada, exige
+/// el conjunto completo.
+const Set<String> _tablasNucleo = {
   'activos',
   'movimientos',
   'metas_financieras',
@@ -54,6 +63,16 @@ const Set<String> _tablasFitki = {
   'categorias_personalizadas',
   'perfil',
 };
+
+/// Tablas que las migraciones de `DbHelper._onUpgrade` crean por encima del
+/// núcleo. Mantener en sincronía con `_onCreate`/`_onUpgrade` de db_helper.dart.
+const Set<String> _tablasAgregadas = {
+  'abonos_metas',
+  'inversiones_movimientos',
+};
+
+/// Todas las tablas que [DbHelper] crea al inicializar.
+const Set<String> _tablasFitki = {..._tablasNucleo, ..._tablasAgregadas};
 
 /// Copia el archivo .db actual (la misma ruta que usa [DbHelper]) a un
 /// archivo temporal del dispositivo con nombre
@@ -217,8 +236,33 @@ Future<bool> _esBackupFitkiValido(String ruta) async {
   }
 }
 
-/// Comprueba que la conexión tenga todas las tablas de Fitki.
+/// Comprueba que la conexión tenga las tablas del núcleo de Fitki. Es la
+/// validación que se hace sobre el archivo ELEGIDO tal como está, sin migrarlo:
+/// por eso exige solo el núcleo y no las tablas que las migraciones crean.
 Future<bool> _esquemaCompleto(sqflite.Database db) async {
+  return await _tieneTablas(db, _tablasNucleo);
+}
+
+/// Igual que [_esquemaCompleto] pero sobre la base ya reabierta y migrada: ahí
+/// sí tienen que estar todas las tablas, incluidas las que agrega una versión
+/// posterior de la app, porque las migraciones debieron crearlas. Además ejecuta
+/// una consulta de lectura real sobre la tabla más liviana del esquema (perfil,
+/// presente en cualquier backup de Fitki) para confirmar que la base
+/// reemplazada no solo tiene el esquema sino que además es legible.
+Future<bool> _esquemaCompletoYLegible(sqflite.Database db) async {
+  try {
+    if (!await _tieneTablas(db, _tablasFitki)) return false;
+    await db.rawQuery('SELECT COUNT(*) AS total FROM perfil');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<bool> _tieneTablas(
+  sqflite.Database db,
+  Set<String> requeridas,
+) async {
   final filas = await db.rawQuery(
     "SELECT name FROM sqlite_master WHERE type = 'table'",
   );
@@ -226,21 +270,7 @@ Future<bool> _esquemaCompleto(sqflite.Database db) async {
       .map((fila) => fila['name'] as String?)
       .whereType<String>()
       .toSet();
-  return _tablasFitki.every(presentes.contains);
-}
-
-/// Igual que [_esquemaCompleto] y además ejecuta una consulta de lectura real
-/// sobre la tabla más liviana del esquema (perfil, presente en cualquier
-/// backup de Fitki) para confirmar que la base reemplazada no solo tiene el
-/// esquema sino que además es legible.
-Future<bool> _esquemaCompletoYLegible(sqflite.Database db) async {
-  try {
-    if (!await _esquemaCompleto(db)) return false;
-    await db.rawQuery('SELECT COUNT(*) AS total FROM perfil');
-    return true;
-  } catch (_) {
-    return false;
-  }
+  return requeridas.every(presentes.contains);
 }
 
 /// Elimina los journals/checkpoints hermanos de [rutaBase] (restos de

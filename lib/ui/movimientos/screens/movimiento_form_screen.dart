@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +12,7 @@ import '../../../data/models/asset.dart';
 import '../../../data/models/categoria_personalizada.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../../../data/providers/shared_providers.dart';
+import '../../../data/storage/comprobante_storage.dart';
 
 class MovimientoFormScreen extends ConsumerStatefulWidget {
   final Transaction? movimiento;
@@ -22,6 +25,12 @@ class MovimientoFormScreen extends ConsumerStatefulWidget {
 }
 
 class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
+  File? _comprobante;
+  String? _comprobantePathActual;
+  String? _comprobanteNombreActual;
+  String? _comprobanteMimeActual;
+  int? _comprobanteSizeActual;
+  bool _eliminarComprobante = false;
   final _formKey = GlobalKey<FormState>();
   final _montoController = TextEditingController();
   final _notaController = TextEditingController();
@@ -46,6 +55,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
       _activoId = m.activoId;
       _fecha = m.fecha;
       _notaController.text = m.nota ?? '';
+      _comprobantePathActual = m.comprobantePath;
+      _comprobanteNombreActual = m.comprobanteNombre;
+      _comprobanteMimeActual = m.comprobanteMimeType;
+      _comprobanteSizeActual = m.comprobanteSizeBytes;
     } else {
       _fecha = DateTime.now();
     }
@@ -58,14 +71,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
     super.dispose();
   }
 
-  /// Opciones del dropdown de categoría: fijas del tipo vigente + las
-  /// personalizadas del usuario (ver categoriasDeTipo). Si el movimiento en
-  /// edición usa una categoría que ya no existe (p. ej. una personalizada
-  /// borrada), se agrega como opción para que la selección siga visible.
   List<String> _opcionesCategoria() {
     final personalizadas = ref
-        .read(categoriasPersonalizadasStreamProvider)
-        .value ??
+            .read(categoriasPersonalizadasStreamProvider)
+            .value ??
         const <CategoriaPersonalizada>[];
     final categorias = categoriasDeTipo(_tipo, personalizadas);
     if (categorias.contains(_categoria)) return categorias;
@@ -97,22 +106,45 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Todo gasto tiene que salir de una cuenta: es lo que hace que el
-    // presupuesto por activo sume bien. Si hay una sola, se usa sola; si hay
-    // varias y no eligió, se pregunta.
-    if (_tipo == Transaction.tipoGasto) {
-      final activos =
-          ref.read(activosStreamProvider).asData?.value ?? const <Asset>[];
-      final activoId = await resolverActivoDeGasto(
-        context,
-        activos: activos,
-        actual: _activoId,
-      );
-      if (activoId == null) return;
-      _activoId = activoId;
-    }
+    // Todo movimiento va atado a una cuenta, sin importar su tipo: es lo que
+    // hace que el saldo del activo cuadre con su historial y que el
+    // presupuesto sume bien. Antes solo los gastos lo exigían, así que un
+    // ingreso se podía guardar con "Sin activo" y el dinero aparecía de la
+    // nada sin tocar ningún saldo, en silencio.
+    final activos =
+        ref.read(activosStreamProvider).asData?.value ?? const <Asset>[];
+    final activoId = await resolverActivoDeGasto(
+      context,
+      activos: activos,
+      actual: _activoId,
+      mensajeSinActivos: 'Crea primero una cuenta o activo para registrar '
+          'movimientos: todo el dinero entra y sale de una cuenta.',
+    );
+    if (activoId == null) return;
+    _activoId = activoId;
 
     final monto = milesADouble(_montoController.text) ?? 0;
+
+    String? comprobantePath = _comprobantePathActual;
+    String? comprobanteNombre = _comprobanteNombreActual;
+    String? comprobanteMime = _comprobanteMimeActual;
+    int? comprobanteSize = _comprobanteSizeActual;
+
+    if (_eliminarComprobante) {
+      await ComprobanteStorage().limpiarSiOrfano(_comprobantePathActual);
+      comprobantePath = null;
+      comprobanteNombre = null;
+      comprobanteMime = null;
+      comprobanteSize = null;
+    } else if (_comprobante != null) {
+      final archivo = await ComprobanteStorage().guardarArchivo(_comprobante!);
+      comprobantePath = archivo.path;
+      comprobanteNombre = archivo.nombre;
+      comprobanteMime = _mimeDe(_comprobante!.path);
+      comprobanteSize = archivo.sizeBytes;
+      await ComprobanteStorage().limpiarSiOrfano(_comprobantePathActual);
+    }
+
     final nuevo = Transaction(
       id: widget.movimiento?.id,
       tipo: _tipo,
@@ -124,6 +156,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
           ? null
           : _notaController.text.trim(),
       fechaCreacion: widget.movimiento?.fechaCreacion ?? DateTime.now(),
+      comprobantePath: comprobantePath,
+      comprobanteNombre: comprobanteNombre,
+      comprobanteMimeType: comprobanteMime,
+      comprobanteSizeBytes: comprobanteSize,
     );
 
     try {
@@ -219,17 +255,14 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
               data: (activos) {
                 return DropdownButtonFormField<int?>(
                   initialValue: _activoId,
-                  decoration: const InputDecoration(labelText: 'Activo'),
-                  hint: const Text('Sin activo'),
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Activo *'),
+                  hint: const Text('Elige una cuenta'),
                   items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('Sin activo'),
-                    ),
                     ...activos.map((asset) => DropdownMenuItem<int?>(
                           value: asset.id,
                           child: Text(
-                            '${asset.nombre} (${_formatearSaldo(asset)})',
+                            '${asset.nombre} · ${_formatearSaldo(asset)}',
                             overflow: TextOverflow.ellipsis,
                           ),
                         )),
@@ -272,6 +305,9 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            _buildComprobante(),
+            const SizedBox(height: 16),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               switchInCurve: Curves.easeOut,
@@ -328,6 +364,14 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
                 _tipo == 'ingreso'
                     ? 'Se sumará al saldo del activo seleccionado.'
                     : 'Se descontará del saldo del activo seleccionado.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall!,
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Text(
+                'Todo movimiento necesita una cuenta: es lo que mantiene el '
+                'saldo del activo siempre cuadrado.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall!,
               ),
@@ -393,5 +437,174 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
   String _formatearSaldo(Asset asset) {
     final symbol = asset.moneda == 'USD' ? r'US$' : r'$';
     return AppFormat.moneda(asset.montoDisponible, symbol: symbol);
+  }
+
+  Widget _buildComprobante() {
+    final tieneNuevo = _comprobante != null;
+    final tieneActual = !_eliminarComprobante &&
+        _comprobantePathActual != null &&
+        _comprobantePathActual!.isNotEmpty;
+
+    if (tieneNuevo) {
+      final esImagen = _esImagen(_comprobante!.path);
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  esImagen
+                      ? Icons.image_rounded
+                      : Icons.description_rounded,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Comprobante seleccionado',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _quitarComprobante,
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Quitar comprobante',
+                ),
+              ],
+            ),
+            if (esImagen) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  _comprobante!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: 180,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (tieneActual) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.attach_file_rounded, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _comprobanteNombreActual ?? 'Comprobante',
+                style: Theme.of(context).textTheme.titleSmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              onPressed: _quitarComprobante,
+              child: const Text('Quitar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: _seleccionarComprobante,
+      icon: const Icon(Icons.add_photo_alternate_rounded),
+      label: const Text('Adjuntar comprobante (opcional)'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _seleccionarComprobante() async {
+    final origen = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (origen == null) return;
+
+    try {
+      final resultado = await ImagePicker().pickImage(
+        source: origen,
+        maxWidth: 2000,
+        imageQuality: 85,
+      );
+      if (resultado == null) return;
+      setState(() {
+        _comprobante = File(resultado.path);
+        _eliminarComprobante = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo seleccionar la imagen')),
+        );
+      }
+    }
+  }
+
+  void _quitarComprobante() {
+    setState(() {
+      if (_comprobante != null) {
+        _comprobante = null;
+      } else {
+        _eliminarComprobante = true;
+      }
+    });
+  }
+
+  bool _esImagen(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.heic');
+  }
+
+  String _mimeDe(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.heic')) return 'image/heic';
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    return 'image/jpeg';
   }
 }

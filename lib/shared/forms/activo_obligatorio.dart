@@ -5,12 +5,16 @@ import '../theme/app_colors.dart';
 
 /// Resuelve qué activo (cuenta) queda asociado a un gasto.
 ///
-/// Es la regla única de la app: un gasto nunca se guarda sin activo, porque
-/// el presupuesto se calcula sobre el dinero que sale de una cuenta concreta.
+/// Es la regla única de la app: un movimiento nunca se guarda sin activo,
+/// porque el presupuesto se calcula sobre el dinero que sale de una cuenta
+/// concreta y ningún saldo puede quedar fuera del historial.
 ///
 /// - Sin activos avisa que hay que crear uno primero y no deja seguir.
 /// - Con un solo activo lo toma como valor por defecto, sin preguntar.
 /// - Con varios y ninguno elegido, pregunta cuál es.
+///
+/// [mensajeSinActivos] permite que cada módulo explique su propio caso (un
+/// préstamo, un abono a una meta) en vez del texto genérico de gasto.
 ///
 /// Devuelve el id del activo elegido, o null si el usuario canceló o no hay
 /// activos disponibles.
@@ -18,13 +22,16 @@ Future<int?> resolverActivoDeGasto(
   BuildContext context, {
   required List<Asset> activos,
   int? actual,
+  String? mensajeSinActivos,
 }) async {
   if (activos.isEmpty) {
     await mostrarAviso(
       context,
       'Necesitas un activo',
-      'Crea primero una cuenta o activo para poder registrar gastos. '
-      'Todo gasto debe salir de una cuenta para que el presupuesto sume bien.',
+      mensajeSinActivos ??
+          'Crea primero una cuenta o activo para poder registrar gastos. '
+              'Todo gasto debe salir de una cuenta para que el presupuesto '
+              'sume bien.',
     );
     return null;
   }
@@ -48,7 +55,7 @@ Future<int?> _preguntarActivo(
   final elegido = await showDialog<int>(
     context: context,
     builder: (context) => SimpleDialog(
-      title: const Text('¿De qué cuenta salió el dinero?'),
+      title: const Text('¿De qué cuenta sale el dinero?'),
       children: [
         for (final activo in activos)
           SimpleDialogOption(

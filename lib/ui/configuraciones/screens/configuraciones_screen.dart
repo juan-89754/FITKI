@@ -6,6 +6,7 @@ import '../../../data/preferences/app_preferences.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_logo.dart';
+import '../../home/tab_navigation.dart';
 import '../widgets/perfil_avatar.dart';
 
 /// Pantalla central de Configuraciones: une el perfil, las preferencias
@@ -291,7 +292,7 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
               colorFrente: AppColors.primary,
               titulo: 'Categorías personalizadas',
               subtitulo: 'Gestiona tus categorías de gasto e ingreso',
-              onTap: () => context.push('/categorias'),
+              onTap: () => irAModulo(context, TabIndex.categorias),
             ),
           ),
           const SizedBox(height: 28),

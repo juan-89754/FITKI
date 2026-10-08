@@ -1,7 +1,7 @@
 // Navegación principal de Fitki usando go_router.
-// El HomeShell agrupa las 4 pestañas en un StatefulShellRoute y mantiene el
-// AppBottomNav fijo. El resto de módulos se alcanzan desde el menú lateral,
-// que empuja secciones por encima del shell.
+// El HomeShell agrupa los 11 módulos en un StatefulShellRoute y mantiene el
+// AppBottomNav fijo. Cada módulo es una rama del shell, así que se llega a todos
+// tocando la barra o deslizando el PageView del contenedor.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +11,6 @@ import 'package:intl/intl.dart';
 import '../../shared/format/app_format.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
-import '../../shared/widgets/app_drawer.dart';
 import '../../shared/widgets/category_tile.dart';
 import '../../data/models/financial_goal.dart';
 import '../../data/models/transaction.dart';
@@ -33,32 +32,28 @@ void irAMovimientos(BuildContext context) {
   StatefulNavigationShell.of(context).goBranch(TabIndex.movimientos);
 }
 
-class _ShellDrawerScope extends InheritedWidget {
-  const _ShellDrawerScope({
-    required this.openDrawer,
-    required super.child,
-  });
-
-  /// Abre el menú lateral del shell. Vive en un scope porque los headers de
-  /// cada pantalla cuelgan de su propio `Scaffold`, y ahí `Scaffold.of`
-  /// resuelve al anidado (que no tiene drawer) en vez del que lo tiene.
-  final VoidCallback openDrawer;
-
-  @override
-  bool updateShouldNotify(_ShellDrawerScope oldWidget) =>
-      openDrawer != oldWidget.openDrawer;
-}
-
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
+  /// Los 11 módulos, en el mismo orden que las ramas del shell en `main.dart`.
+  ///
+  /// "Préstamos" es la etiqueta corta de "Préstamos e inversiones": la barra
+  /// reserva 84px por módulo y el nombre completo no entra sin recortarse a
+  /// mitad de palabra.
   static const List<AppNavItem> navItems = [
     AppNavItem(icon: Icons.home_rounded, label: 'Inicio'),
     AppNavItem(icon: Icons.swap_horiz_rounded, label: 'Movimientos'),
     AppNavItem(icon: Icons.account_balance_rounded, label: 'Activos'),
     AppNavItem(icon: Icons.savings_rounded, label: 'Gastos'),
+    AppNavItem(icon: Icons.credit_score_rounded, label: 'Deudas'),
+    AppNavItem(icon: Icons.flag_rounded, label: 'Metas'),
+    AppNavItem(icon: Icons.trending_up_rounded, label: 'Préstamos'),
+    AppNavItem(icon: Icons.insert_chart_outlined_rounded, label: 'Estadísticas'),
+    AppNavItem(icon: Icons.ballot_rounded, label: 'Cotizaciones'),
+    AppNavItem(icon: Icons.category_outlined, label: 'Categorías'),
+    AppNavItem(icon: Icons.settings_rounded, label: 'Configuración'),
   ];
 
   /// Comportamiento de la barra:
@@ -98,13 +93,7 @@ class HomeShell extends ConsumerWidget {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        drawer: const AppDrawer(),
-        body: Builder(
-          builder: (shellBodyContext) => _ShellDrawerScope(
-            openDrawer: () => Scaffold.of(shellBodyContext).openDrawer(),
-            child: navigationShell,
-          ),
-        ),
+        body: navigationShell,
         bottomNavigationBar: AppBottomNav(
           currentIndex: navigationShell.currentIndex,
           onTap: (index) => _onSeleccionar(context, ref, index),
@@ -144,6 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final patrimonio = ref.watch(patrimonioTotalProvider);
+    final disponible = ref.watch(patrimonioDisponibleTotalProvider);
     final movimientosAsync = ref.watch(movimientosStreamProvider);
     final metas =
         ref.watch(metasStreamProvider).asData?.value ?? const <FinancialGoal>[];
@@ -179,6 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           _Header(
             patrimonio: patrimonio,
+            disponible: disponible,
             saludo: _saludo(),
             perfil: perfil,
           ),
@@ -205,11 +196,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _Header extends StatelessWidget {
   const _Header({
     required this.patrimonio,
+    required this.disponible,
     required this.saludo,
     this.perfil,
   });
 
+  /// Todo el dinero de las cuentas, incluido lo apartado en metas.
   final double patrimonio;
+
+  /// [patrimonio] menos lo reservado en metas: lo que se puede gastar.
+  final double disponible;
+
   final String saludo;
   final Perfil? perfil;
 
@@ -227,7 +224,7 @@ class _Header extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 36),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
       // El recorte evita que los círculos decorativos se salgan del bloque
       // verde: antes se cortaban contra el borde de la lista y se leían como un
@@ -267,33 +264,6 @@ class _Header extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // El menú va a la izquierda y el avatar se queda en la
-                  // esquina superior derecha. Ambos miden 44 para que queden
-                  // alineados al mismo eje.
-                  IconButton(
-                    onPressed:
-                        context
-                            .dependOnInheritedWidgetOfExactType<
-                              _ShellDrawerScope
-                            >()
-                            ?.openDrawer,
-                    tooltip: 'Abrir menú',
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      fixedSize: const Size.square(44),
-                      minimumSize: const Size.square(44),
-                      maximumSize: const Size.square(44),
-                      backgroundColor: AppColors.textOnPrimary.withValues(
-                        alpha: 0.15,
-                      ),
-                    ),
-                    icon: const Icon(
-                      Icons.menu_rounded,
-                      color: AppColors.textOnPrimary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,8 +300,14 @@ class _Header extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 28),
+              // El número grande es el disponible y no el patrimonio. El home
+              // responde "¿cuánto tengo para gastar?", y eso ya descuenta lo
+              // apartado en metas. El patrimonio total queda como dato aparte
+              // abajo: el dinero de una meta nunca salió de la cuenta, así que
+              // sumarlo al disponible sería mostrar como gastable plata que ya
+              // tiene destino.
               Text(
-                'PATRIMONIO TOTAL',
+                'DISPONIBLE PARA GASTAR',
                 style: Theme.of(context).textTheme.labelSmall!.copyWith(
                   letterSpacing: 1.2,
                   color: AppColors.textOnPrimary.withValues(alpha: 0.7),
@@ -339,17 +315,77 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                HomeScreen._moneda(patrimonio),
+                HomeScreen._moneda(disponible),
                 style: Theme.of(context).textTheme.headlineLarge!.copyWith(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textOnPrimary,
                 ),
               ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _DatoResumen(
+                      etiqueta: 'Patrimonio total',
+                      valor: HomeScreen._moneda(patrimonio),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DatoResumen(
+                      etiqueta: 'Reservado en metas',
+                      valor: HomeScreen._moneda(patrimonio - disponible),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Un dato secundario del encabezado: etiqueta chica arriba, valor abajo.
+///
+/// Va con `Expanded` y no con ancho fijo porque las dos columnas comparten el
+/// ancho y los importes largos (o una escala de fuente grande) los descuadran.
+class _DatoResumen extends StatelessWidget {
+  const _DatoResumen({required this.etiqueta, required this.valor});
+
+  final String etiqueta;
+  final String valor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          etiqueta,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall!.copyWith(
+            fontSize: 10,
+            color: AppColors.textOnPrimary.withValues(alpha: 0.65),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          valor,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall!.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textOnPrimary.withValues(alpha: 0.95),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -408,13 +444,13 @@ class _CategoriasState extends State<_Categorias> {
                     label: 'Metas',
                     icon: Icons.flag_rounded,
                     amount: widget.metasTotal,
-                    onTap: () => context.push('/metas'),
+                    onTap: () => irAModulo(context, TabIndex.metas),
                   ),
                   (
                     label: 'Deudas',
                     icon: Icons.account_balance_wallet_rounded,
                     amount: widget.deudasPendiente,
-                    onTap: () => context.push('/deudas'),
+                    onTap: () => irAModulo(context, TabIndex.deudas),
                   ),
                 ];
                 final cat = categories[index];
@@ -532,13 +568,21 @@ class _UltimosMovimientos extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Últimos movimientos',
-                style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+              // El botón "Ver todos" tiene ancho fijo, así que el título cede
+              // antes de desbordar cuando el texto crece (escala de fuente del
+              // sistema o títulos más largos).
+              Flexible(
+                child: Text(
+                  'Últimos movimientos',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               TextButton(
                 onPressed: () => irAMovimientos(context),
                 style: TextButton.styleFrom(

@@ -10,9 +10,9 @@
 # Se genera:
 #   - Android legacy     mipmap-*/ic_launcher.png (logo con esquinas redondeadas;
 #                        Android 24-25 no soporta el icono adaptativo)
-#   - Android adaptativo mipmap-*/ic_launcher_foreground.png (recorte central
-#                        seguro del 66%, la zona que ningun recorte del launcher
-#                        toca) + mipmap-anydpi-v26/ic_launcher.xml
+#   - Android adaptativo mipmap-*/ic_launcher_foreground.png (el logo dentro de
+#                        la zona segura del 108dp, la zona que ningun recorte
+#                        del launcher toca) + mipmap-anydpi-v26/ic_launcher.xml
 #   - iOS                Runner/Assets.xcassets/AppIcon.appiconset
 #   - macOS              Runner/Assets.xcassets/AppIcon.appiconset
 #   - Windows            runner\resources\app_icon.ico
@@ -81,19 +81,29 @@ function Draw-LogoCompleto {
     }
 }
 
-# Dibuja solo el centro del logo, ampliado hasta llenar el lienzo. Es el
-# tratamiento correcto para el icono adaptativo de Android: lo que queda fuera
-# del 66% central puede recortarse sin que se pierda nada del diseno.
-function Draw-LogoRecortado {
-    param([System.Drawing.Graphics]$Graphics, [int]$Size, [double]$Fraccion = 0.66)
+# Dibuja el logo completo reducido dentro de la zona segura del icono adaptativo.
+#
+# El lienzo del icono adaptativo es de 108dp, pero el launcher recorta un circulo
+# (o un cuadrado con esquinas redondeadas) de 72dp en el centro, y solo el 66dp
+# central sobrevive a cualquier recorte. Por eso el arte NO se amplia hasta
+# llenar el lienzo: si lo hiciera, el recorte se comeria las bordes del logo y
+# quedaria una figura cortada que ya no se reconoce como el logo. Ese fue el
+# defecto del icono anterior, que recortaba el 66% central y lo estiraba a las
+# 108dp completas.
+#
+# Aqui el logo se dibuja entero ocupando solo el 70% central, y el resto queda
+# transparente. Como el fondo del logo es exactamente el color de
+# ic_launcher_background (#0F6A47), ese margen transparente no se ve: el icono se
+# ve como un campo verde continuo con la marca a una proporcion comoda, que es
+# justo lo que se busca.
+function Draw-LogoEnZonaSegura {
+    param([System.Drawing.Graphics]$Graphics, [int]$Size, [double]$Zona = 0.7)
 
-    $ancho = [int][Math]::Round($script:logo.Width * $Fraccion)
-    $alto = [int][Math]::Round($script:logo.Height * $Fraccion)
-    $izq = [int][Math]::Round(($script:logo.Width - $ancho) / 2)
-    $sup = [int][Math]::Round(($script:logo.Height - $alto) / 2)
-
-    $destino = New-Object System.Drawing.Rectangle(0, 0, $Size, $Size)
-    $origen = New-Object System.Drawing.Rectangle($izq, $sup, $ancho, $alto)
+    $util = [int][Math]::Round($Size * $Zona)
+    $offset = [int][Math]::Round(($Size - $util) / 2)
+    $destino = New-Object System.Drawing.Rectangle($offset, $offset, $util, $util)
+    $origen = New-Object System.Drawing.Rectangle(
+        0, 0, $script:logo.Width, $script:logo.Height)
     $Graphics.DrawImage(
         $script:logo, $destino, $origen, [System.Drawing.GraphicsUnit]::Pixel)
 }
@@ -114,14 +124,14 @@ function Draw-LogoConMargen {
 }
 
 # Crea un icono ya rasterizado. -Opaco descarta el canal alfa (lo exigen iOS y
-# la ficha de Play); -Modo elige entre el logo entero, el recorte central seguro
-# o el logo con margen.
+# la ficha de Play); -Modo elige entre el logo entero, el logo dentro de la zona
+# segura del icono adaptativo o el logo con margen.
 function New-Icono {
     param(
         [int]$Size,
         [double]$Radio = 0,
         [bool]$Opaco = $false,
-        [ValidateSet('completo', 'recortado', 'margen')]
+        [ValidateSet('completo', 'zonasegura', 'margen')]
         [string]$Modo = 'completo',
         [double]$Margen = 0.1
     )
@@ -148,7 +158,7 @@ function New-Icono {
             $g.Clear([System.Drawing.Color]::Transparent)
         }
         switch ($Modo) {
-            'recortado' { Draw-LogoRecortado -Graphics $g -Size $Size }
+            'zonasegura' { Draw-LogoEnZonaSegura -Graphics $g -Size $Size }
             'margen' { Draw-LogoConMargen -Graphics $g -Size $Size -Margen $Margen }
             default { Draw-LogoCompleto -Graphics $g -Size $Size -Radio $Radio }
         }
@@ -188,7 +198,10 @@ try {
     # ---- Android ---------------------------------------------------------
     Write-Output 'Android'
     $res = Join-Path $root 'android\app\src\main\res'
-    $densities = [ordered]@{
+
+    # Icono legacy: el launcher usa el PNG tal cual, al tamano del icono de la
+    # app (48dp de base).
+    $legacyDensities = [ordered]@{
         'mdpi'    = 48
         'hdpi'    = 72
         'xhdpi'   = 96
@@ -196,7 +209,20 @@ try {
         'xxxhdpi' = 192
     }
 
-    foreach ($entry in $densities.GetEnumerator()) {
+    # Capa adaptativa: el sistema la escala SIEMPRE hasta llenar un lienzo de
+    # 108dp, sin importar el tamano del PNG. Por eso tiene que generarse a
+    # 108dp x densidad y no al tamano del icono legacy: con 48dp el bitmap llega
+    # al lienzo 확대 mas del doble y el logo se ve borroso justo en los
+    # telefonos que mas lo notan (xxhdpi en adelante).
+    $adaptiveDensities = [ordered]@{
+        'mdpi'    = 108
+        'hdpi'    = 162
+        'xhdpi'   = 216
+        'xxhdpi'  = 324
+        'xxxhdpi' = 432
+    }
+
+    foreach ($entry in $legacyDensities.GetEnumerator()) {
         $dir = Join-Path $res "mipmap-$($entry.Key)"
 
         # Legacy: el launcher aplica su propia mascara, asi que basta con
@@ -204,10 +230,16 @@ try {
         $legacy = New-Icono -Size $entry.Value -Radio 0.22
         try { Write-Bitmap -Bitmap $legacy -Path (Join-Path $dir 'ic_launcher.png') }
         finally { $legacy.Dispose() }
+    }
 
-        # Adaptativo: el lienzo es de 108dp y solo el 66% central sobrevive a
-        # cualquier recorte, por eso el recorte se amplia hasta llenarlo.
-        $foreground = New-Icono -Size $entry.Value -Modo 'recortado'
+    foreach ($entry in $adaptiveDensities.GetEnumerator()) {
+        $dir = Join-Path $res "mipmap-$($entry.Key)"
+
+        # Adaptativo: el lienzo es de 108dp y el launcher recorta los 72dp
+        # centrales, asi que el logo va dentro de la zona segura (70% del
+        # lienzo) y no ampliado. El fondo del logo coincide con
+        # ic_launcher_background, asi que el margen sobrante no se ve.
+        $foreground = New-Icono -Size $entry.Value -Modo 'zonasegura'
         try {
             Write-Bitmap -Bitmap $foreground `
             -Path (Join-Path $dir 'ic_launcher_foreground.png')
@@ -224,7 +256,12 @@ try {
 <!--
   Icono adaptativo de Fitki. Generado por tool\generate_launcher_icons.ps1 a
   partir de assets\icon\icon.png: el fondo es el color de marca y el primer
-  plano es el recorte central seguro del logo.
+  plano es el logo reducido dentro de la zona segura (70% del lienzo de 108dp).
+
+  El logo NO se amplia hasta llenar el lienzo: el launcher recorta los 72dp
+  centrales, y arte a tamano completo se veria cortado por el recorte. El margen
+  sobrante del primer plano es transparente y no se nota, porque el fondo del
+  logo es exactamente este mismo color.
 
   La capa monochrome se omite a proposito: Android 13+ la tine con un unico
   color usando el canal alfa, y un logo opaco produciria un bloque solido.

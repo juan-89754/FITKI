@@ -110,7 +110,7 @@ class EstadisticasLogic {
     final patrimonioActual =
         activos.fold<double>(0, (acc, a) => acc + a.montoDisponible);
 
-    final flujoNeto = (Transaction m) =>
+    double flujoNeto(Transaction m) =>
         m.tipo == 'ingreso' ? m.monto : -m.monto;
 
     final puntos = <PuntoEvolucion>[];

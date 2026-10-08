@@ -12,13 +12,22 @@ const _kPillBottomMargin = 14.0;
 const _kPillHorizontalMargin = 14.0;
 const _kActiveCircleSize = 44.0;
 
+/// Ancho fijo de cada módulo en la barra.
+///
+/// Con los 11 módulos de la app la barra ya no entra en pantalla, así que no
+/// puede repartir el ancho con `Expanded`: cada ítem mide lo mismo y el conjunto
+/// se desliza. El ancho es el menor que deja leer "Configuración" y
+/// "Estadísticas" completas en la etiqueta de 10px, que son las dos más largas.
+const _kItemWidth = 84.0;
+
 /// Barra de navegación inferior de la app.
 ///
-/// Con 4 destinos entra completa en pantalla, así que no necesita carrusel ni
-/// scroll: los items se reparten a lo ancho y la etiqueta nunca se recorta. El
-/// contenedor sigue siendo un `GestureDetector` y no un `InkWell` porque la
-/// píldora tiene bordes redondeados y no hay superficie Material debajo.
-class AppBottomNav extends StatelessWidget {
+/// Con 11 módulos la barra es un carrusel horizontal: entra lo que entra y el
+/// resto se desliza con el dedo o con la barra misma. Cuando cambia el módulo —
+/// porque se tocó un ítem o porque se arrastró el `PageView` de las pantallas—
+/// la barra se reposa sola para dejar la pestaña activa a la vista; si no, al
+/// volver de Configuración a Inicio el usuario no vería en qué está.
+class AppBottomNav extends StatefulWidget {
   const AppBottomNav({
     super.key,
     required this.currentIndex,
@@ -29,6 +38,64 @@ class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<AppNavItem> items;
+
+  @override
+  State<AppBottomNav> createState() => _AppBottomNavState();
+}
+
+class _AppBottomNavState extends State<AppBottomNav> {
+  final ScrollController _controller = ScrollController();
+
+  /// Una clave por ítem para poder pedir que el scrollable lo revele.
+  late List<GlobalKey> _claves = List.generate(
+    widget.items.length,
+    (_) => GlobalKey(),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // La app puede abrir en un módulo que no sea el primero (enlace profundo o
+    // restauración de estado), y en ese caso hay que dejar la barra ya posada.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revelarActiva());
+  }
+
+  @override
+  void didUpdateWidget(AppBottomNav oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != _claves.length) {
+      _claves = List.generate(widget.items.length, (_) => GlobalKey());
+    }
+    if (widget.currentIndex != oldWidget.currentIndex) {
+      // `ensureVisible` pide scroll a un RenderObject, y `didUpdateWidget`
+      // corre en fase de build: hacerlo acá puede pedir layout antes de tiempo.
+      // Se posterga al primer frame, que es cuando las claves ya tienen contexto.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revelarActiva());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Desplaza la barra lo justo para que el módulo activo quede centrado.
+  void _revelarActiva() {
+    if (!mounted) return;
+    final index = widget.currentIndex;
+    if (index < 0 || index >= _claves.length) return;
+
+    final contexto = _claves[index].currentContext;
+    if (contexto == null) return;
+
+    Scrollable.ensureVisible(
+      contexto,
+      alignment: 0.5,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,14 +125,24 @@ class AppBottomNav extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            children: List.generate(
-              items.length,
-              (index) => Expanded(
-                child: _ItemNav(
-                  item: items[index],
-                  isActive: currentIndex == index,
-                  onTap: () => onTap(index),
+          // Un `Row` dentro de un scroll horizontal en vez de `Expanded`: los 11
+          // módulos no se reparten el ancho, se deslizan. La `Row` construye
+          // todos sus hijos, así que las claves existen aunque el ítem esté fuera
+          // de vista y `_revelarActiva` siempre puede encontrarlo.
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(
+                widget.items.length,
+                (index) => SizedBox(
+                  key: _claves[index],
+                  width: _kItemWidth,
+                  child: _ItemNav(
+                    item: widget.items[index],
+                    isActive: widget.currentIndex == index,
+                    onTap: () => widget.onTap(index),
+                  ),
                 ),
               ),
             ),
@@ -133,7 +210,7 @@ class _ItemNav extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Text(
                 item.label,
                 maxLines: 1,
