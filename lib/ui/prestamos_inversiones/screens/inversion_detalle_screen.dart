@@ -11,6 +11,8 @@ import '../../../logic/inversiones/inversiones_logic.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../prestamos_inversiones_providers.dart';
 import 'inversion_form_screen.dart';
 
@@ -128,48 +130,36 @@ class InversionDetalleScreen extends ConsumerWidget {
     if (guardado == true) ref.invalidate(inversionesStreamProvider);
   }
 
-  void _eliminar(BuildContext context, WidgetRef ref, Investment inversion) {
-    showDialog(
+  Future<void> _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    Investment inversion,
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar inversión'),
-        content: Text(
-          '¿Eliminar la inversión en '
+      title: 'Eliminar inversión',
+      message: '¿Eliminar la inversión en '
           '${InversionesLogic.labelTipo(inversion.tipo)}? '
           'El capital reservado vuelve a estar disponible.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(inversionRepositoryProvider).delete(inversion.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(inversionesStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(inversionRepositoryProvider).delete(inversion.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(inversionesStreamProvider);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 
@@ -477,15 +467,19 @@ class _AccionesInversion extends ConsumerWidget {
       }
     } on OperacionInversionInvalida catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.mensaje)),
+        AppSnackbar.show(
+          context,
+          message: e.mensaje,
+          type: AppSnackbarType.error,
         );
       }
       return;
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo registrar, intenta de nuevo')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo registrar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -494,53 +488,42 @@ class _AccionesInversion extends ConsumerWidget {
     ref.invalidate(inversionesStreamProvider);
     ref.invalidate(movimientosDeInversionProvider(inversion.id!));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$titulo registrado')),
+      AppSnackbar.show(
+        context,
+        message: '$titulo registrado',
+        type: AppSnackbarType.success,
       );
     }
   }
 
   Future<void> _finalizar(BuildContext context, WidgetRef ref) async {
-    final confirmar = await showDialog<bool>(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Finalizar inversión'),
-        content: const Text(
-          'Se liberará el capital reservado y el resultado neto se registrará '
-          'en el historial de movimientos: como ingreso si ganó, como gasto si '
-          'perdió. Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Finalizar'),
-          ),
-        ],
-      ),
+      title: 'Finalizar inversión',
+      message: 'Se liberará el capital reservado y el resultado neto se '
+          'registrará en el historial de movimientos: como ingreso si ganó, '
+          'como gasto si perdió. Esta acción no se puede deshacer.',
+      confirmLabel: 'Finalizar',
     );
-    if (confirmar != true) return;
+    if (confirmado != true) return;
 
     try {
       await ref.read(inversionRepositoryProvider).finalizar(inversion.id!);
     } on OperacionInversionInvalida catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.mensaje)),
+        AppSnackbar.show(
+          context,
+          message: e.mensaje,
+          type: AppSnackbarType.error,
         );
       }
       return;
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo finalizar, intenta de nuevo')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo finalizar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -549,8 +532,10 @@ class _AccionesInversion extends ConsumerWidget {
     ref.invalidate(inversionesStreamProvider);
     ref.invalidate(movimientosDeInversionProvider(inversion.id!));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inversión finalizada')),
+      AppSnackbar.show(
+        context,
+        message: 'Inversión finalizada',
+        type: AppSnackbarType.success,
       );
     }
   }
@@ -584,8 +569,10 @@ class _AccionesInversion extends ConsumerWidget {
             onPressed: () {
               final valor = milesADouble(controller.text);
               if (valor == null || valor <= 0) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Ingresa un monto válido')),
+                AppSnackbar.show(
+                  ctx,
+                  message: 'Ingresa un monto válido',
+                  type: AppSnackbarType.error,
                 );
                 return;
               }

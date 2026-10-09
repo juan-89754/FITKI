@@ -6,6 +6,7 @@ import '../../../data/preferences/app_preferences.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_logo.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../home/tab_navigation.dart';
 import '../widgets/perfil_avatar.dart';
 
@@ -65,10 +66,10 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
       // Si el guardado falló, el slider vuelve al último valor que realmente
       // quedó persistido: la UI no debe mostrar un estado que no corresponde.
       setState(() => _umbralCargaDeuda = ultimoPersistido);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo guardar el umbral, intenta de nuevo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'No se pudo guardar el umbral, intenta de nuevo',
+        type: AppSnackbarType.error,
       );
     }
   }
@@ -93,10 +94,10 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
       if (!mounted) return;
       // Si el guardado falló, el switch vuelve al valor realmente persistido.
       setState(() => _notificacionesHabilitadas = ultimoPersistido);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo guardar la preferencia, intenta de nuevo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'No se pudo guardar la preferencia, intenta de nuevo',
+        type: AppSnackbarType.error,
       );
     }
   }

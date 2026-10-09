@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/asset.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_dialog.dart';
 
 /// Resuelve qué activo (cuenta) queda asociado a un gasto.
 ///
@@ -99,17 +100,9 @@ Future<void> mostrarAviso(
   String titulo,
   String mensaje,
 ) async {
-  await showDialog<void>(
+  await AppDialog.info(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(titulo),
-      content: Text(mensaje),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Entendido'),
-        ),
-      ],
-    ),
+    title: titulo,
+    message: mensaje,
   );
 }

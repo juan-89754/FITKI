@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../logic/prestamos/prestamos_logic.dart';
@@ -139,10 +141,10 @@ class PrestamoDetalleScreen extends ConsumerWidget {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo registrar el pago'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo registrar el pago',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -152,13 +154,11 @@ class PrestamoDetalleScreen extends ConsumerWidget {
     ref.invalidate(movimientosStreamProvider);
     ref.invalidate(activosStreamProvider);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Pago registrado. ${AppFormat.moneda(resultado.monto)} '
+      AppSnackbar.show(
+        context,
+        message: 'Pago registrado. ${AppFormat.moneda(resultado.monto)} '
             'sumados al activo.',
-          ),
-        ),
+        type: AppSnackbarType.success,
       );
     }
   }
@@ -286,7 +286,7 @@ class PrestamoDetalleScreen extends ConsumerWidget {
   }
 
   void _avisar(BuildContext context, String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
+    AppSnackbar.show(context, message: mensaje, type: AppSnackbarType.error);
   }
 
   String _formatearMonto(double valor) {
@@ -309,58 +309,42 @@ class PrestamoDetalleScreen extends ConsumerWidget {
     });
   }
 
-  void _eliminar(
+  Future<void> _eliminar(
     BuildContext context,
     WidgetRef ref,
     Loan prestamo,
     String? nombreActivo,
-  ) {
-    showDialog(
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar préstamo'),
-        content: Text(
-          '¿Eliminar el préstamo a ${prestamo.nombreBeneficiario}?\n\n'
+      title: 'Eliminar préstamo',
+      message: '¿Eliminar el préstamo a ${prestamo.nombreBeneficiario}?\n\n'
           'Se borrarán sus movimientos y el dinero volverá a '
           '${nombreActivo ?? 'la cuenta de origen'}: '
           '${AppFormat.moneda(prestamo.montoPrestado)} '
           'que prestaste y ${AppFormat.moneda(prestamo.montoPagado)} '
           'que ya recuperaste.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(prestamoRepositoryProvider).delete(prestamo.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(prestamosStreamProvider);
-              ref.invalidate(movimientosStreamProvider);
-              ref.invalidate(activosStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(prestamoRepositoryProvider).delete(prestamo.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(prestamosStreamProvider);
+    ref.invalidate(movimientosStreamProvider);
+    ref.invalidate(activosStreamProvider);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 

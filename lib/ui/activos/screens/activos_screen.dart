@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/asset.dart';
 import '../../../logic/activos/activos_logic.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -56,40 +58,28 @@ class ActivosScreen extends ConsumerWidget {
     ).then((_) => ref.invalidate(activosStreamProvider));
   }
 
-  void _confirmarEliminar(BuildContext context, WidgetRef ref, Asset asset) {
-    showDialog(
+  void _confirmarEliminar(BuildContext context, WidgetRef ref, Asset asset) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar activo'),
-        content: Text('¿Eliminar "${asset.nombre}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(activoRepositoryProvider).delete(asset.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(activosStreamProvider);
-              if (context.mounted) Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar activo',
+      message: '¿Eliminar "${asset.nombre}"?',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+    try {
+      await ref.read(activoRepositoryProvider).delete(asset.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(activosStreamProvider);
   }
 
   @override

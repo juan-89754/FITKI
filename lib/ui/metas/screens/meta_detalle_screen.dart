@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/abono_meta.dart';
 import '../../../data/models/financial_goal.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -183,14 +185,12 @@ class MetaDetalleScreen extends ConsumerWidget {
 
     if (opciones.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              esAporte
-                  ? 'No hay cuentas con saldo disponible para aportar'
-                  : 'Esta meta no tiene dinero reservado en ninguna cuenta',
-            ),
-          ),
+        AppSnackbar.show(
+          context,
+          message: esAporte
+              ? 'No hay cuentas con saldo disponible para aportar'
+              : 'Esta meta no tiene dinero reservado en ninguna cuenta',
+          type: AppSnackbarType.info,
         );
       }
       return;
@@ -226,21 +226,21 @@ class MetaDetalleScreen extends ConsumerWidget {
       // El repositorio es la autoridad: si algo no cuadra, su mensaje explica
       // exactamente qué falta, y se muestra tal cual.
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.mensaje)),
+        AppSnackbar.show(
+          context,
+          message: e.mensaje,
+          type: AppSnackbarType.error,
         );
       }
       return;
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              esAporte
-                  ? 'No se pudo registrar el aporte'
-                  : 'No se pudo registrar el retiro',
-            ),
-          ),
+        AppSnackbar.show(
+          context,
+          message: esAporte
+              ? 'No se pudo registrar el aporte'
+              : 'No se pudo registrar el retiro',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -248,12 +248,10 @@ class MetaDetalleScreen extends ConsumerWidget {
 
     _refrescarTrasRegistro(ref);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            esAporte ? 'Aporte registrado' : 'Retiro registrado',
-          ),
-        ),
+      AppSnackbar.show(
+        context,
+        message: esAporte ? 'Aporte registrado' : 'Retiro registrado',
+        type: AppSnackbarType.success,
       );
     }
   }
@@ -266,32 +264,17 @@ class MetaDetalleScreen extends ConsumerWidget {
     AbonoMeta registro,
   ) async {
     final esAporte = registro.esAporte;
-    final confirmado = await showDialog<bool>(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(esAporte ? 'Quitar aporte' : 'Quitar retiro'),
-        content: Text(
+      title: esAporte ? 'Quitar aporte' : 'Quitar retiro',
+      message:
           '¿Quitar el ${esAporte ? 'aporte' : 'retiro'} de '
           '${AppFormat.moneda(registro.monto)} del '
           '${DateFormat('dd MMM yyyy').format(registro.fecha)}?\n\n'
           'La meta deja de sumar ese monto en su avance y el dinero vuelve a '
           'estar disponible para gastar en la cuenta.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Quitar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Quitar',
+      destructive: true,
     );
     if (confirmado != true) return;
 
@@ -302,8 +285,10 @@ class MetaDetalleScreen extends ConsumerWidget {
       if (eliminados == 0) throw Exception('El registro ya no existe');
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo quitar, intenta de nuevo')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo quitar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -311,8 +296,10 @@ class MetaDetalleScreen extends ConsumerWidget {
 
     _refrescarTrasRegistro(ref);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(esAporte ? 'Aporte quitado' : 'Retiro quitado')),
+      AppSnackbar.show(
+        context,
+        message: esAporte ? 'Aporte quitado' : 'Retiro quitado',
+        type: AppSnackbarType.success,
       );
     }
   }
@@ -430,8 +417,10 @@ class MetaDetalleScreen extends ConsumerWidget {
               onPressed: () {
                 final valor = milesADouble(controller.text);
                 if (valor == null || valor <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Ingresa un monto válido')),
+                  AppSnackbar.show(
+                    ctx,
+                    message: 'Ingresa un monto válido',
+                    type: AppSnackbarType.error,
                   );
                   return;
                 }
@@ -471,59 +460,47 @@ class MetaDetalleScreen extends ConsumerWidget {
     });
   }
 
-void _eliminar(BuildContext context, WidgetRef ref, FinancialGoal meta) {
+  Future<void> _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    FinancialGoal meta,
+  ) async {
     final registros =
         ref.read(registrosDeMetaProvider(meta.id!)).asData?.value ??
             const <AbonoMeta>[];
     final saldo = MetasLogic.saldoDeMeta(registros);
 
-    showDialog(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar meta'),
-        content: Text(
-          registros.isEmpty
-              ? '¿Eliminar "${meta.nombre}"?'
-              : '¿Eliminar "${meta.nombre}"?\n\n'
-                    'Esta meta tiene ${registros.length} '
-                    '${registros.length == 1 ? 'registro' : 'registros'} y '
-                    '${AppFormat.moneda(saldo)} apartados. Al eliminarla, esa '
-                    'reserva desaparece y el dinero vuelve a estar disponible '
-                    'para gastar. El dinero nunca salió de las cuentas, así que '
-                    'no se devuelve nada: simplemente deja de estar apartado.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(metaRepositoryProvider).delete(meta.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              _refrescarTrasRegistro(ref);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar meta',
+      message: registros.isEmpty
+          ? '¿Eliminar "${meta.nombre}"?'
+          : '¿Eliminar "${meta.nombre}"?\n\n'
+                'Esta meta tiene ${registros.length} '
+                '${registros.length == 1 ? 'registro' : 'registros'} y '
+                '${AppFormat.moneda(saldo)} apartados. Al eliminarla, esa '
+                'reserva desaparece y el dinero vuelve a estar disponible '
+                'para gastar. El dinero nunca salió de las cuentas, así que '
+                'no se devuelve nada: simplemente deja de estar apartado.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(metaRepositoryProvider).delete(meta.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    _refrescarTrasRegistro(ref);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 

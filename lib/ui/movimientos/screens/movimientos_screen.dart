@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../logic/categorias/categoria_labels.dart';
@@ -179,14 +181,12 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
       if (accion == 'editar') {
         if (!_puedeEditar(movimiento)) {
           if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                movimiento.categoria == categoriaAhorroMeta
-                    ? 'Los abonos a metas se cambian desde la propia meta'
-                    : 'Los movimientos de un pr�stamo se cambian desde el pr�stamo',
-              ),
-            ),
+          AppSnackbar.show(
+            context,
+            message: movimiento.categoria == categoriaAhorroMeta
+                ? 'Los abonos a metas se cambian desde la propia meta'
+                : 'Los movimientos de un pr�stamo se cambian desde el pr�stamo',
+            type: AppSnackbarType.info,
           );
           return;
         }
@@ -203,14 +203,13 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
 
   void _abrirFormulario(BuildContext context, {Transaction? movimiento}) {
     if (!_puedeEditar(movimiento)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      AppSnackbar.show(
+        context,
+        message:
             movimiento != null && movimiento.categoria == categoriaAhorroMeta
                 ? 'Los abonos a metas se cambian desde la propia meta'
                 : 'Los movimientos de un prǸstamo se cambian desde el prǸstamo',
-          ),
-        ),
+        type: AppSnackbarType.info,
       );
       return;
     }
@@ -228,65 +227,45 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
     });
   }
 
-  void _confirmarEliminar(BuildContext context, Transaction movimiento) {
+  void _confirmarEliminar(BuildContext context, Transaction movimiento) async {
     if (movimiento.prestamoId != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
+      AppSnackbar.show(
+        context,
+        message:
             'Los movimientos de un préstamo se quitan desde el préstamo, '
             'para devolver el dinero a la cuenta',
-          ),
-        ),
+        type: AppSnackbarType.info,
       );
       return;
     }
 
-    showDialog(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar movimiento'),
-        content: Text(
+      title: 'Eliminar movimiento',
+      message:
           '¿Eliminar ${movimiento.categoria} por ${AppFormat.moneda(movimiento.monto)}?'
           '\nSe revertirá el saldo del activo asociado.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                // El repositorio borra el movimiento y devuelve el monto al
-                // saldo de su activo en la misma transacción.
-                await ref
-                    .read(movimientoRepositoryProvider)
-                    .delete(movimiento.id!);
-                await ComprobanteStorage()
-                    .limpiarSiOrfano(movimiento.comprobantePath);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(movimientosStreamProvider);
-              ref.invalidate(activosStreamProvider);
-              if (context.mounted) Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+    try {
+      // El repositorio borra el movimiento y devuelve el monto al
+      // saldo de su activo en la misma transacción.
+      await ref.read(movimientoRepositoryProvider).delete(movimiento.id!);
+      await ComprobanteStorage().limpiarSiOrfano(movimiento.comprobantePath);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(movimientosStreamProvider);
+    ref.invalidate(activosStreamProvider);
   }
 }
 

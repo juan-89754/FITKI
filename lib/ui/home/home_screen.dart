@@ -13,6 +13,7 @@ import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/category_tile.dart';
 import '../../data/models/financial_goal.dart';
+import '../../data/models/investment.dart';
 import '../../data/models/transaction.dart';
 import '../../data/models/perfil.dart';
 import '../../data/providers/shared_providers.dart';
@@ -23,6 +24,7 @@ import '../movimientos/movimientos_providers.dart';
 import '../activos/activos_providers.dart';
 import '../deudas/deudas_providers.dart';
 import '../metas/metas_providers.dart';
+import '../prestamos_inversiones/prestamos_inversiones_providers.dart';
 import 'tab_navigation.dart';
 
 /// Salta a la pestaña de Movimientos. Se usa `goBranch` y no `context.go`
@@ -138,6 +140,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final metas =
         ref.watch(metasStreamProvider).asData?.value ?? const <FinancialGoal>[];
     final deudasActivas = ref.watch(deudasActivasProvider);
+    final inversiones =
+        ref.watch(inversionesStreamProvider).asData?.value ?? const <Investment>[];
     final perfil = ref.watch(perfilStreamProvider).asData?.value;
 
     final movimientos =
@@ -160,6 +164,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .fold<double>(0, (acc, meta) => acc + meta.montoAhorrado);
     final deudasPendiente =
         deudasActivas.fold<double>(0, (acc, deuda) => acc + deuda.montoPendiente);
+    final inversionesTotal = inversiones
+        .where((inversion) => inversion.estaActiva)
+        .fold<double>(0, (acc, inversion) => acc + inversion.montoInvertido);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -168,7 +175,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         padding: EdgeInsets.zero,
         children: [
           _Header(
-            patrimonio: patrimonio,
             disponible: disponible,
             saludo: _saludo(),
             perfil: perfil,
@@ -176,6 +182,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _Categorias(
             metasTotal: metasTotal,
             deudasPendiente: deudasPendiente,
+            inversionesTotal: inversionesTotal,
+            patrimonioTotal: patrimonio,
           ),
           _BarraBusqueda(
             controller: _busquedaController,
@@ -195,16 +203,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 class _Header extends StatelessWidget {
   const _Header({
-    required this.patrimonio,
     required this.disponible,
     required this.saludo,
     this.perfil,
   });
 
-  /// Todo el dinero de las cuentas, incluido lo apartado en metas.
-  final double patrimonio;
-
-  /// [patrimonio] menos lo reservado en metas: lo que se puede gastar.
+  /// Todo el dinero de las cuentas menos lo reservado; lo que se puede gastar.
   final double disponible;
 
   final String saludo;
@@ -302,10 +306,10 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 28),
               // El número grande es el disponible y no el patrimonio. El home
               // responde "¿cuánto tengo para gastar?", y eso ya descuenta lo
-              // apartado en metas. El patrimonio total queda como dato aparte
-              // abajo: el dinero de una meta nunca salió de la cuenta, así que
-              // sumarlo al disponible sería mostrar como gastable plata que ya
-              // tiene destino.
+              // apartado en metas. El patrimonio total y lo reservado aparecen
+              // en las tarjetas de abajo: el dinero de una meta nunca salió de
+              // la cuenta, así que sumarlo al disponible sería mostrar como
+              // gastable plata que ya tiene destino.
               Text(
                 'DISPONIBLE PARA GASTAR',
                 style: Theme.of(context).textTheme.labelSmall!.copyWith(
@@ -322,25 +326,6 @@ class _Header extends StatelessWidget {
                   color: AppColors.textOnPrimary,
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _DatoResumen(
-                      etiqueta: 'Patrimonio total',
-                      valor: HomeScreen._moneda(patrimonio),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _DatoResumen(
-                      etiqueta: 'Reservado en metas',
-                      valor: HomeScreen._moneda(patrimonio - disponible),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ],
@@ -349,55 +334,18 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Un dato secundario del encabezado: etiqueta chica arriba, valor abajo.
-///
-/// Va con `Expanded` y no con ancho fijo porque las dos columnas comparten el
-/// ancho y los importes largos (o una escala de fuente grande) los descuadran.
-class _DatoResumen extends StatelessWidget {
-  const _DatoResumen({required this.etiqueta, required this.valor});
-
-  final String etiqueta;
-  final String valor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          etiqueta,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall!.copyWith(
-            fontSize: 10,
-            color: AppColors.textOnPrimary.withValues(alpha: 0.65),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          valor,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleSmall!.copyWith(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textOnPrimary.withValues(alpha: 0.95),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _Categorias extends StatefulWidget {
   const _Categorias({
     required this.metasTotal,
     required this.deudasPendiente,
+    required this.inversionesTotal,
+    required this.patrimonioTotal,
   });
 
   final double metasTotal;
   final double deudasPendiente;
+  final double inversionesTotal;
+  final double patrimonioTotal;
 
   @override
   State<_Categorias> createState() => _CategoriasState();
@@ -429,17 +377,11 @@ class _CategoriasState extends State<_Categorias> {
             height: 120,
             child: PageView.builder(
               controller: _pageController,
-              itemCount: 3,
+              itemCount: 4,
               onPageChanged: (index) => setState(() => _currentPage = index),
               physics: const BouncingScrollPhysics(),
               itemBuilder: (context, index) {
                 final categories = [
-                  (
-                    label: 'Movimientos',
-                    icon: Icons.swap_horiz_rounded,
-                    amount: 0.0,
-                    onTap: () => irAMovimientos(context),
-                  ),
                   (
                     label: 'Metas',
                     icon: Icons.flag_rounded,
@@ -451,6 +393,18 @@ class _CategoriasState extends State<_Categorias> {
                     icon: Icons.account_balance_wallet_rounded,
                     amount: widget.deudasPendiente,
                     onTap: () => irAModulo(context, TabIndex.deudas),
+                  ),
+                  (
+                    label: 'Inversiones',
+                    icon: Icons.trending_up_rounded,
+                    amount: widget.inversionesTotal,
+                    onTap: () => irAModulo(context, TabIndex.prestamos),
+                  ),
+                  (
+                    label: 'Patrimonio total',
+                    icon: Icons.account_balance_rounded,
+                    amount: widget.patrimonioTotal,
+                    onTap: () => irAModulo(context, TabIndex.activos),
                   ),
                 ];
                 final cat = categories[index];
@@ -471,7 +425,7 @@ class _CategoriasState extends State<_Categorias> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              3,
+              4,
               (index) => AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 margin: const EdgeInsets.symmetric(horizontal: 3),

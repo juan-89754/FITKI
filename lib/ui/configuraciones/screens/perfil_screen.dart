@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import '../../../data/models/perfil.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../widgets/perfil_avatar.dart';
 
 /// Edición del perfil del usuario: foto de perfil (cámara o galería) y
@@ -108,10 +110,10 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       if (_esErrorDePermiso(error)) {
         await _mostrarDialogoPermisos();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se pudo cargar la foto: $error'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo cargar la foto: $error',
+          type: AppSnackbarType.error,
         );
       }
     }
@@ -125,25 +127,14 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   }
 
   Future<void> _mostrarDialogoPermisos() async {
-    await showDialog<void>(
+    await AppDialog.info(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Permiso de cámara requerido'),
-          content: const Text(
-            'Fitki necesita acceso a la cámara o la galería para '
-            'cambiar tu foto de perfil.\n\n'
-            'Puedes habilitar el permiso desde los ajustes del sistema '
-            'en la sección de permisos de la app.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
+      title: 'Permiso de cámara requerido',
+      message:
+          'Fitki necesita acceso a la cámara o la galería para '
+          'cambiar tu foto de perfil.\n\n'
+          'Puedes habilitar el permiso desde los ajustes del sistema '
+          'en la sección de permisos de la app.',
     );
   }
 
@@ -185,10 +176,10 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;

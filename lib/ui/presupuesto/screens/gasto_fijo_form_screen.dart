@@ -10,6 +10,8 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../presupuesto_providers.dart';
 
 /// Alta y edición de un gasto fijo.
@@ -112,25 +114,14 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
   }
 
   Future<void> _eliminar() async {
-    final confirmado = await showDialog<bool>(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Eliminar ${widget.gasto!.nombre}?'),
-        content: const Text(
+      title: 'Eliminar ${widget.gasto!.nombre}?',
+      message:
           'Se borra la plantilla y los pagos que dejó registrados. '
           'Los movimientos de dinero que ya se registraron no se tocan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirmado != true) return;
 
@@ -144,7 +135,11 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
   }
 
   void _error(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
+    AppSnackbar.show(
+      context,
+      message: mensaje,
+      type: AppSnackbarType.error,
+    );
   }
 
   @override

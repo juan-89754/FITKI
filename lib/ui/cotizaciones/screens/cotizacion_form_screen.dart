@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/quote.dart';
 import '../cotizaciones_providers.dart';
 
@@ -134,10 +135,10 @@ class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;

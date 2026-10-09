@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../activos/activos_providers.dart';
 import 'gasto_fijo_form_screen.dart';
 import 'presupuesto_activo_form_screen.dart';
@@ -61,10 +62,10 @@ class _PresupuestoScreenState extends ConsumerState<PresupuestoScreen>
         ref.read(activosConSaldoProvider);
     if (activos.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Crea una cuenta antes de definir un presupuesto'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'Crea una cuenta antes de definir un presupuesto',
+        type: AppSnackbarType.info,
       );
       return;
     }

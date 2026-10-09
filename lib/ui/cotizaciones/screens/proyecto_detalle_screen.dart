@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/quote_project.dart';
 import '../../../data/models/quote.dart';
 import '../../../logic/cotizaciones/cotizaciones_logic.dart';
@@ -147,49 +149,37 @@ class ProyectoDetalleScreen extends ConsumerWidget {
     });
   }
 
-  void _eliminar(BuildContext context, WidgetRef ref, QuoteProject proyecto) {
-    showDialog(
+  Future<void> _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    QuoteProject proyecto,
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar proyecto'),
-        content: const Text(
-            'Se eliminará el proyecto y sus cotizaciones e items. ¿Continuar?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(proyectoRepositoryProvider)
-                    .delete(proyecto.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(proyectosStreamProvider);
-              ref.invalidate(cotizacionesStreamProvider);
-              ref.invalidate(itemsStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar proyecto',
+      message:
+          'Se eliminará el proyecto y sus cotizaciones e items. ¿Continuar?',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(proyectoRepositoryProvider).delete(proyecto.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(proyectosStreamProvider);
+    ref.invalidate(cotizacionesStreamProvider);
+    ref.invalidate(itemsStreamProvider);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 

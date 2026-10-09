@@ -10,6 +10,8 @@ import '../../../data/providers/shared_providers.dart';
 import '../../../logic/backup/backup_logic.dart';
 import '../../../logic/backup/reset_logic.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../cotizaciones/cotizaciones_providers.dart';
 import '../../deudas/deudas_providers.dart';
 import '../../metas/metas_providers.dart';
@@ -92,10 +94,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _procesando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo generar el backup, intenta de nuevo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'No se pudo generar el backup, intenta de nuevo',
+        type: AppSnackbarType.error,
       );
     }
   }
@@ -121,86 +123,58 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     } on FileSystemException catch (_) {
       if (!mounted) return;
       setState(() => _procesando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('El archivo elegido no existe'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'El archivo elegido no existe',
+        type: AppSnackbarType.error,
       );
     } on FormatException catch (_) {
       if (!mounted) return;
       setState(() => _procesando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Este archivo no es un backup válido de Fitki'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'Este archivo no es un backup válido de Fitki',
+        type: AppSnackbarType.error,
       );
     } on RestauracionRevertidaException catch (_) {
       if (!mounted) return;
       setState(() => _procesando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(RestauracionRevertidaException.mensajeUsuario),
-        ),
+      AppSnackbar.show(
+        context,
+        message: RestauracionRevertidaException.mensajeUsuario,
+        type: AppSnackbarType.error,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _procesando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo restaurar, intenta de nuevo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'No se pudo restaurar, intenta de nuevo',
+        type: AppSnackbarType.error,
       );
     }
   }
 
   Future<bool?> _confirmarRestauracion() {
-    return showDialog<bool>(
+    return AppDialog.confirm(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Restaurar backup'),
-          content: const Text(
-            'Vas a reemplazar TODOS los datos actuales de Fitki por los '
-            'contenidos en el backup elegido. Esta acción no se puede '
-            'deshacer.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Restaurar',
-                style: TextStyle(color: AppColors.coral),
-              ),
-            ),
-          ],
-        );
-      },
+      title: 'Restaurar backup',
+      message:
+          'Vas a reemplazar TODOS los datos actuales de Fitki por los '
+          'contenidos en el backup elegido. Esta acción no se puede '
+          'deshacer.',
+      confirmLabel: 'Restaurar',
+      destructive: true,
     );
   }
 
   Future<void> _mostrarExitoRestauracion() {
-    return showDialog<void>(
+    return AppDialog.info(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          icon: Icon(Icons.check_circle_rounded, color: AppColors.primary),
-          title: const Text('Backup restaurado'),
-          content: const Text(
-            'Tus datos se restauraron correctamente. Se recomienda cerrar y '
-            'volver a abrir la app para asegurar que todo se recargue.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
+      title: 'Backup restaurado',
+      message:
+          'Tus datos se restauraron correctamente. Se recomienda cerrar y '
+          'volver a abrir la app para asegurar que todo se recargue.',
     );
   }
 
@@ -220,40 +194,24 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _borrando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudieron borrar los datos, intenta de nuevo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'No se pudieron borrar los datos, intenta de nuevo',
+        type: AppSnackbarType.error,
       );
     }
   }
 
   Future<bool?> _confirmarBorrado() {
-    return showDialog<bool>(
+    return AppDialog.confirm(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('¿Borrar todos los datos?'),
-          content: const Text(
-            'Se eliminarán permanentemente tus movimientos, cuentas, metas, '
-            'deudas, préstamos, cotizaciones, presupuestos y perfil. '
-            'Esta acción no se puede deshacer.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Continuar',
-                style: TextStyle(color: AppColors.coral),
-              ),
-            ),
-          ],
-        );
-      },
+      title: '¿Borrar todos los datos?',
+      message:
+          'Se eliminarán permanentemente tus movimientos, cuentas, metas, '
+          'deudas, préstamos, cotizaciones, presupuestos y perfil. '
+          'Esta acción no se puede deshacer.',
+      confirmLabel: 'Continuar',
+      destructive: true,
     );
   }
 
@@ -330,30 +288,15 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   }
 
   Future<void> _mostrarExitoBorrado() {
-    return showDialog<void>(
+    return AppDialog.info(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          icon: const Icon(
-            Icons.delete_sweep_rounded,
-            color: AppColors.coral,
-          ),
-          title: const Text('Datos borrados'),
-          content: const Text(
-            'Se borraron todos tus registros financieros y tu perfil: '
-            'activos, movimientos, deudas, metas, préstamos, cotizaciones y '
-            'presupuestos.\n\n'
-            'Tus preferencias de apariencia, seguridad (PIN), notificaciones '
-            'y umbral de alerta siguen intactas.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
+      title: 'Datos borrados',
+      message:
+          'Se borraron todos tus registros financieros y tu perfil: '
+          'activos, movimientos, deudas, metas, préstamos, cotizaciones y '
+          'presupuestos.\n\n'
+          'Tus preferencias de apariencia, seguridad (PIN), notificaciones '
+          'y umbral de alerta siguen intactas.',
     );
   }
 

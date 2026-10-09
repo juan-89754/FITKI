@@ -7,6 +7,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/categoria_personalizada.dart';
@@ -178,10 +179,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -573,8 +574,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
       });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo seleccionar la imagen')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo seleccionar la imagen',
+          type: AppSnackbarType.error,
         );
       }
     }

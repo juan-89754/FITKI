@@ -55,6 +55,7 @@ class QuoteItem {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cotizacion_id INTEGER NOT NULL,
       producto_servicio TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'producto',
       cantidad INTEGER NOT NULL DEFAULT 1,
       precio_unitario REAL NOT NULL,
       enlace_compra TEXT,

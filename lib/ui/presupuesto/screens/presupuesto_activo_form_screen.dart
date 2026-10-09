@@ -11,6 +11,8 @@ import '../../../logic/activos/activos_logic.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../metas/metas_providers.dart';
 import '../../prestamos_inversiones/prestamos_inversiones_providers.dart';
 import '../presupuesto_providers.dart';
@@ -96,33 +98,24 @@ class _PresupuestoActivoFormScreenState
       if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo guardar, intenta de nuevo')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
     }
   }
 
   Future<void> _eliminar() async {
-    final confirmado = await showDialog<bool>(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Quitar el presupuesto?'),
-        content: const Text(
+      title: 'Quitar el presupuesto?',
+      message:
           'Se borra el límite de este mes. Los gastos ya registrados y sus '
           'movimientos no se tocan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Quitar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Quitar',
+      destructive: true,
     );
     if (confirmado != true) return;
 
@@ -134,8 +127,10 @@ class _PresupuestoActivoFormScreenState
       if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo eliminar, intenta de nuevo')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
     }

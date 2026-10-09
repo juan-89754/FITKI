@@ -5,6 +5,8 @@ import '../../../data/models/categoria_personalizada.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../presupuesto/presupuesto_providers.dart';
 
 /// Gestión de categorías personalizadas de gasto/ingreso. Las categorías se
@@ -50,10 +52,10 @@ class _CategoriasScreenState extends ConsumerState<CategoriasScreen> {
             ref.invalidate(categoriasPersonalizadasStreamProvider);
           } catch (_) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('No se pudo guardar, intenta de nuevo'),
-                ),
+              AppSnackbar.show(
+                context,
+                message: 'No se pudo guardar, intenta de nuevo',
+                type: AppSnackbarType.error,
               );
             }
           }
@@ -63,30 +65,15 @@ class _CategoriasScreenState extends ConsumerState<CategoriasScreen> {
   }
 
   Future<void> _confirmarEliminar(CategoriaPersonalizada categoria) async {
-    final confirmado = await showDialog<bool>(
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar categoría'),
-        content: Text(
+      title: 'Eliminar categoría',
+      message:
           'Se eliminará "${categoria.nombre}". Los movimientos y presupuestos '
           'que la usan se mantendrán y se mostrarán como "Categoría '
           'eliminada".',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
     if (confirmado != true || !mounted) return;
 
@@ -104,10 +91,10 @@ class _CategoriasScreenState extends ConsumerState<CategoriasScreen> {
       await catRepo.delete(categoria.id!);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo eliminar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;

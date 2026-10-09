@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/quote.dart';
 import '../../../data/models/quote_item.dart';
 import '../../../logic/cotizaciones/cotizaciones_logic.dart';
@@ -109,88 +111,64 @@ class CotizacionDetalleScreen extends ConsumerWidget {
     });
   }
 
-  void _eliminarItem(BuildContext context, WidgetRef ref, QuoteItem item) {
-    showDialog(
+  Future<void> _eliminarItem(
+    BuildContext context,
+    WidgetRef ref,
+    QuoteItem item,
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar item'),
-        content: Text('¿Eliminar "${item.productoServicio}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(itemCotizacionRepositoryProvider)
-                    .delete(item.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(itemsStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar item',
+      message: '¿Eliminar "${item.productoServicio}"?',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(itemCotizacionRepositoryProvider).delete(item.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(itemsStreamProvider);
   }
 
-  void _eliminar(BuildContext context, WidgetRef ref, Quote cotizacion) {
-    showDialog(
+  Future<void> _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    Quote cotizacion,
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar cotización'),
-        content: Text('¿Eliminar "${cotizacion.titulo}" y sus items?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(cotizacionRepositoryProvider)
-                    .delete(cotizacion.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(cotizacionesStreamProvider);
-              ref.invalidate(itemsStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar cotización',
+      message: '¿Eliminar "${cotizacion.titulo}" y sus items?',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(cotizacionRepositoryProvider).delete(cotizacion.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(cotizacionesStreamProvider);
+    ref.invalidate(itemsStreamProvider);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 
@@ -338,11 +316,11 @@ class _ItemCard extends StatelessWidget {
               InkWell(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: item.enlaceCompra!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Enlace copiado al portapapeles'),
-                      duration: Duration(seconds: 2),
-                    ),
+                  AppSnackbar.show(
+                    context,
+                    message: 'Enlace copiado al portapapeles',
+                    type: AppSnackbarType.success,
+                    duration: const Duration(seconds: 2),
                   );
                 },
                 borderRadius: BorderRadius.circular(6),

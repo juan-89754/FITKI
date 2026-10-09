@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../format/app_format.dart';
 import '../theme/app_colors.dart';
 
-/// Tarjeta del carrusel de inicio (Movimientos, Metas y Deudas).
+/// Tarjeta del carrusel de inicio (Metas, Deudas, Inversiones y Patrimonio).
 ///
-/// Las tres comparten exactamente el mismo aspecto: un fondo neutro profundo
+/// Todas comparten exactamente el mismo aspecto: un fondo neutro profundo
 /// con texto blanco. No se tiñen con el color de marca ni con un color por
 /// tarjeta, porque el bloque de arriba ya usa el acento de la app y cualquier
 /// color saturado en la tarjeta se fundía con él. La información se distingue

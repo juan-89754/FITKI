@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/abono_meta.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/investment.dart';
@@ -116,10 +117,10 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;

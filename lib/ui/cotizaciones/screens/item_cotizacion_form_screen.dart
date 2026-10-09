@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/quote_item.dart';
 import '../cotizaciones_providers.dart';
 
@@ -338,10 +340,10 @@ class _ItemCotizacionFormScreenState
     if (_tipoItem == QuoteItem.tipoServicio &&
         _notasController.text.trim().isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Para servicios, las notas son obligatorias'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'Para servicios, las notas son obligatorias',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -393,10 +395,10 @@ class _ItemCotizacionFormScreenState
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -406,34 +408,18 @@ class _ItemCotizacionFormScreenState
   }
 
   Future<bool> _confirmarOmitidas(int cantidad) async {
-    final continuar = await showDialog<bool>(
+    final continuar = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Costos adicionales incompletos'),
-        content: Text(
-          cantidad == 1
-              ? '1 fila de costos adicionales no se guardará por estar '
-                  'incompleta (concepto vacío o valor inválido).\n\n'
-                  '¿Continuar y guardar las filas válidas?'
-              : '$cantidad filas de costos adicionales no se guardarán por '
-                  'estar incompletas (concepto vacío o valor inválido).\n\n'
-                  '¿Continuar y guardar las filas válidas?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
+      title: 'Costos adicionales incompletos',
+      message: cantidad == 1
+          ? '1 fila de costos adicionales no se guardará por estar '
+              'incompleta (concepto vacío o valor inválido).\n\n'
+              '¿Continuar y guardar las filas válidas?'
+          : '$cantidad filas de costos adicionales no se guardarán por '
+              'estar incompletas (concepto vacío o valor inválido).\n\n'
+              '¿Continuar y guardar las filas válidas?',
+      confirmLabel: 'Continuar',
+      destructive: true,
     );
     return continuar ?? false;
   }

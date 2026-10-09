@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/debt.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/transaction.dart';
@@ -136,8 +138,10 @@ class DeudaDetalleScreen extends ConsumerWidget {
         deuda.copyWith(montoPendiente: deuda.montoPendiente),
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo registrar el pago')),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo registrar el pago',
+          type: AppSnackbarType.error,
         );
       }
       return;
@@ -145,8 +149,10 @@ class DeudaDetalleScreen extends ConsumerWidget {
 
     ref.invalidate(deudasStreamProvider);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago registrado')),
+      AppSnackbar.show(
+        context,
+        message: 'Pago registrado',
+        type: AppSnackbarType.success,
       );
     }
   }
@@ -260,10 +266,10 @@ class DeudaDetalleScreen extends ConsumerWidget {
                   onPressed: () {
                     final valor = milesADouble(montoController.text);
                     if (valor == null || valor <= 0) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ingresa un monto válido'),
-                        ),
+                      AppSnackbar.show(
+                        ctx,
+                        message: 'Ingresa un monto válido',
+                        type: AppSnackbarType.error,
                       );
                       return;
                     }
@@ -306,44 +312,34 @@ class DeudaDetalleScreen extends ConsumerWidget {
     });
   }
 
-  void _eliminar(BuildContext context, WidgetRef ref, Debt deuda) {
-    showDialog(
+  Future<void> _eliminar(
+    BuildContext context,
+    WidgetRef ref,
+    Debt deuda,
+  ) async {
+    final confirmado = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar deuda'),
-        content: Text('¿Eliminar la deuda con ${deuda.nombreAcreedor}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(deudaRepositoryProvider).delete(deuda.id!);
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo eliminar, intenta de nuevo'),
-                    ),
-                  );
-                }
-                return;
-              }
-              ref.invalidate(deudasStreamProvider);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.coral,
-              foregroundColor: AppColors.textOnPrimary,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      title: 'Eliminar deuda',
+      message: '¿Eliminar la deuda con ${deuda.nombreAcreedor}?',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (confirmado != true) return;
+
+    try {
+      await ref.read(deudaRepositoryProvider).delete(deuda.id!);
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo eliminar, intenta de nuevo',
+          type: AppSnackbarType.error,
+        );
+      }
+      return;
+    }
+    ref.invalidate(deudasStreamProvider);
+    if (context.mounted) Navigator.pop(context, true);
   }
 }
 

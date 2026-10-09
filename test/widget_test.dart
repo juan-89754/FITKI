@@ -58,12 +58,11 @@ void main() {
         find.text('Este es el panorama de tus finanzas.'),
         findsOneWidget,
       );
-      // El encabezado muestra el disponible como número principal y el patrimonio
-      // total aparte: la pregunta del home es cuánto hay para gastar, y el
-      // dinero apartado en metas no lo es aunque siga siendo tuyo.
+      // El encabezado muestra únicamente el disponible: la pregunta del home es
+      // cuánto hay para gastar, y el dinero apartado en metas no lo es aunque
+      // siga siendo tuyo. El patrimonio total se movió a las tarjetas de abajo.
       expect(find.text('DISPONIBLE PARA GASTAR'), findsOneWidget);
-      expect(find.text('Patrimonio total'), findsOneWidget);
-      expect(find.text('Reservado en metas'), findsOneWidget);
+      expect(find.text('Reservado en metas'), findsNothing);
       expect(find.text('PATRIMONIO TOTAL'), findsNothing);
 
       // Fitki no tiene pantalla de bloqueo: la app entra directa al inicio, sin

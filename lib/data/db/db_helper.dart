@@ -25,7 +25,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 14;
+  static const int _dbVersion = 15;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -234,6 +234,30 @@ class DbHelper {
       );
       // Historial de aportes, retiros, ganancias y pérdidas de cada inversión.
       await db.execute(InversionMovimiento.createTableSQL);
+    }
+    if (oldVersion < 15) {
+      // `items_cotizacion.tipo` se añadió en la v7, pero el CREATE TABLE que
+      // usa `_onCreate` nunca lo incluyó: una instalación nueva (que nace
+      // directo en la versión actual y no ejecuta migraciones) creaba la tabla
+      // sin la columna, y guardar un item fallaba con "no such column: tipo",
+      // que la pantalla traducía como "No se pudo guardar, intenta de nuevo".
+      //
+      // El esquema inicial ya está corregido, así que esta migración solo
+      // repara las bases que nacieron rotas. Se comprueba antes de añadirla
+      // porque una base que sí pasó por la v7 ya la tiene, y repetir el
+      // ALTER abortaría la migración con "duplicate column name".
+      final columnasItem = await db.rawQuery(
+        'PRAGMA table_info(${QuoteItem.tableName})',
+      );
+      final yaTieneTipo = columnasItem.any(
+        (columna) => columna['name'] == 'tipo',
+      );
+      if (!yaTieneTipo) {
+        await db.execute(
+          "ALTER TABLE ${QuoteItem.tableName} "
+          "ADD COLUMN tipo TEXT NOT NULL DEFAULT '${QuoteItem.tipoProducto}'",
+        );
+      }
     }
   }
 

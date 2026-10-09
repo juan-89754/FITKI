@@ -10,6 +10,7 @@ import '../../../logic/inversiones/inversiones_logic.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class InversionFormScreen extends ConsumerStatefulWidget {
   final Investment? inversion;
@@ -362,17 +363,19 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
       }
     } on OperacionInversionInvalida catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.mensaje)),
+        AppSnackbar.show(
+          context,
+          message: e.mensaje,
+          type: AppSnackbarType.error,
         );
       }
       return;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar, intenta de nuevo'),
-          ),
+        AppSnackbar.show(
+          context,
+          message: 'No se pudo guardar, intenta de nuevo',
+          type: AppSnackbarType.error,
         );
       }
       return;

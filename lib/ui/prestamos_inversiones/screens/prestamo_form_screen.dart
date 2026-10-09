@@ -5,6 +5,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -334,10 +335,10 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fechaPagoEsperada.isBefore(_fechaPrestamo)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La fecha esperada de pago es anterior a la del préstamo'),
-        ),
+      AppSnackbar.show(
+        context,
+        message: 'La fecha esperada de pago es anterior a la del préstamo',
+        type: AppSnackbarType.error,
       );
       return;
     }
@@ -384,10 +385,10 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_mensajeDeError(e)),
-          ),
+        AppSnackbar.show(
+          context,
+          message: _mensajeDeError(e),
+          type: AppSnackbarType.error,
         );
       }
       return;
