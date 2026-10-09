@@ -1,7 +1,10 @@
 import 'package:sqflite/sqflite.dart' show DatabaseExecutor;
 
+import '../models/abono_meta.dart';
 import '../models/asset.dart';
 import '../models/gasto_fijo.dart';
+import '../models/inversion_movimiento.dart';
+import '../models/investment.dart';
 import '../models/loan.dart';
 import '../models/presupuesto_activo.dart';
 import '../models/transaction.dart';
@@ -85,12 +88,15 @@ class ActivoRepository {
   /// Elimina el activo y su presupuesto del mes. Los gastos fijos que lo
   /// respaldaban quedan sin activo en vez de desaparecer: así el usuario
   /// puede reasignarlos a otra cuenta y no pierde la plantilla ni su
-  /// historial. Lo mismo con los préstamos a terceros, que quedan sin cuenta
-  /// de origen pero conservan todo su historial. Los movimientos no se tocan
-  /// (son el historial del dinero).
+  /// historial. Lo mismo con los préstamos a terceros, las metas e
+  /// inversiones, que quedan sin cuenta de origen pero conservan todo su
+  /// historial. Los movimientos no se tocan (son el historial del dinero).
   ///
   /// Las claves foráneas no están habilitadas en la conexión, así que las
-  /// cascadas declaradas en el esquema se aplican aquí a mano.
+  /// cascadas declaradas en el esquema se aplican aquí a mano. La lista tiene
+  /// que cubrir TODA tabla con `activo_id`: `abonos_metas` e
+  /// `inversiones_movimientos` se quedaron sin limpiar y dejaban referencias
+  /// a una cuenta que ya no existía.
   Future<int> delete(int id) async {
     final db = await _dbHelper.database;
     return db.transaction<int>((txn) async {
@@ -107,6 +113,24 @@ class ActivoRepository {
       );
       await txn.update(
         Loan.tableName,
+        {'activo_id': null},
+        where: 'activo_id = ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        AbonoMeta.tableName,
+        {'activo_id': null},
+        where: 'activo_id = ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        Investment.tableName,
+        {'activo_id': null},
+        where: 'activo_id = ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        InversionMovimiento.tableName,
         {'activo_id': null},
         where: 'activo_id = ?',
         whereArgs: [id],

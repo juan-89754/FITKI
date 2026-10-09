@@ -52,16 +52,6 @@ class MovimientoRepository {
     return Transaction.fromMap(maps.first);
   }
 
-  Future<int> update(Transaction movimiento) async {
-    final db = await _dbHelper.database;
-    return await db.update(
-      Transaction.tableName,
-      movimiento.toMap(),
-      where: 'id = ?',
-      whereArgs: [movimiento.id],
-    );
-  }
-
   /// Actualiza un movimiento y ajusta los saldos de los activos afectados en
   /// una única transacción: revierte el efecto del movimiento original sobre
   /// su activo (si tenía), aplica el efecto del movimiento nuevo (si tiene

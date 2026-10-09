@@ -27,6 +27,10 @@ class PrestamoRepository {
         prestamo,
         monto: prestamo.montoPrestado,
         activoId: prestamo.activoId,
+        // El id solo existe después del insert; sin pasarlo el movimiento de
+        // salida queda sin `prestamo_id` y ni la edición ni el borrado del
+        // préstamo podrían revertirlo después.
+        prestamoId: id,
       );
       return id;
     });
@@ -96,6 +100,7 @@ class PrestamoRepository {
         nuevo,
         monto: nuevo.montoPrestado,
         activoId: nuevo.activoId,
+        prestamoId: id,
       );
 
       // 3. Los reembolsos que ya existían se vuelven a escribir apuntando a la
@@ -113,6 +118,19 @@ class PrestamoRepository {
           'nota': reembolso.nota,
           'fecha_creacion': _fechaCreacionDe(reembolso),
         });
+        // Al revertir se le quitó al activo el efecto del reembolso; reinsertar
+        // la fila sin devolverle ese monto dejaría el saldo descuadrado contra
+        // su propio historial.
+        if (nuevo.activoId != null) {
+          await ActivoRepository.ajustarSaldoEnTransaccion(
+            txn,
+            activoId: nuevo.activoId!,
+            delta: ActivoRepository.deltaDeMovimiento(
+              Transaction.tipoIngreso,
+              reembolso.monto,
+            ),
+          );
+        }
       }
     });
   }
@@ -199,11 +217,16 @@ class PrestamoRepository {
 
   /// Movimiento de salida del dinero al prestar: resta del activo de origen y
   /// queda amarrado al préstamo para poder revertirlo con él.
+  ///
+  /// [prestamoId] es el id del préstamo ya persistido: en el alta se conoce
+  /// solo después del `insert` de la fila, y en la edición es el id que ya
+  /// tenía el préstamo.
   Future<void> _escribirMovimientoDeSalida(
     DatabaseExecutor txn,
     Loan prestamo, {
     required double monto,
     required int? activoId,
+    required int? prestamoId,
   }) async {
     final ahora = DateTime.now();
     await txn.insert(Transaction.tableName, {
@@ -212,7 +235,7 @@ class PrestamoRepository {
       'categoria': Loan.categoriaPrestamo,
       'fecha': DateFormat('yyyy-MM-dd').format(prestamo.fechaPrestamo),
       'activo_id': activoId,
-      'prestamo_id': prestamo.id,
+      'prestamo_id': prestamoId,
       'nota': 'Préstamo a ${prestamo.nombreBeneficiario}',
       'fecha_creacion': DateFormat('yyyy-MM-dd HH:mm:ss').format(ahora),
     });

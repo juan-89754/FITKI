@@ -185,7 +185,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
             context,
             message: movimiento.categoria == categoriaAhorroMeta
                 ? 'Los abonos a metas se cambian desde la propia meta'
-                : 'Los movimientos de un pr�stamo se cambian desde el pr�stamo',
+                : 'Los movimientos de un préstamo se cambian desde el préstamo',
             type: AppSnackbarType.info,
           );
           return;
@@ -208,7 +208,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
         message:
             movimiento != null && movimiento.categoria == categoriaAhorroMeta
                 ? 'Los abonos a metas se cambian desde la propia meta'
-                : 'Los movimientos de un prǸstamo se cambian desde el prǸstamo',
+                : 'Los movimientos de un préstamo se cambian desde el préstamo',
         type: AppSnackbarType.info,
       );
       return;
@@ -243,7 +243,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
       context: context,
       title: 'Eliminar movimiento',
       message:
-          '¿Eliminar ${movimiento.categoria} por ${AppFormat.moneda(movimiento.monto)}?'
+          '¿Eliminar ${labelCategoria(movimiento.categoria)} por ${AppFormat.moneda(movimiento.monto)}?'
           '\nSe revertirá el saldo del activo asociado.',
       confirmLabel: 'Eliminar',
       destructive: true,

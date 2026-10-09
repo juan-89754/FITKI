@@ -25,7 +25,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 15;
+  static const int _dbVersion = 16;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -257,6 +257,29 @@ class DbHelper {
           "ALTER TABLE ${QuoteItem.tableName} "
           "ADD COLUMN tipo TEXT NOT NULL DEFAULT '${QuoteItem.tipoProducto}'",
         );
+      }
+    }
+    if (oldVersion < 16) {
+      // El borrado de una cuenta se hacía a mano (las claves foráneas están
+      // desactivadas) y dejó fuera `abonos_metas`, `inversiones` e
+      // `inversiones_movimientos`: sus filas podían quedar apuntando a una
+      // cuenta que ya no existe. Esta migración solo repara esos huérfanos
+      // dejando el enlace en NULL — no borra ninguna fila, porque son parte
+      // del historial del dinero. Los movimientos se excluyen a propósito: su
+      // `activo_id` no se toca por diseño ("los movimientos nunca se tocan,
+      // son el historial").
+      for (final tabla in [
+        AbonoMeta.tableName,
+        InversionMovimiento.tableName,
+        Investment.tableName,
+        Loan.tableName,
+        GastoFijo.tableName,
+      ]) {
+        await db.execute('''
+          UPDATE $tabla SET activo_id = NULL
+          WHERE activo_id IS NOT NULL
+            AND activo_id NOT IN (SELECT id FROM ${Asset.tableName})
+        ''');
       }
     }
   }
