@@ -25,6 +25,9 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    // Base aislada por archivo de test: evita que varios tests que comparten
+    // el mismo `fitki.db` en disco se bloqueen entre sí.
+    DbHelper.rutaParaTests = inMemoryDatabasePath;
   });
 
   setUp(() async {

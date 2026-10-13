@@ -76,7 +76,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
       final xfile = XFile(
         rutaBackup,
-        mimeType: 'application/x-sqlite3',
+        mimeType: 'application/zip',
       );
       // ignore: deprecated_member_use
       await Share.shareXFiles(
@@ -104,9 +104,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
   Future<void> _seleccionarYRestaurar() async {
     final archivo = await FilePicker.pickFile(
-      dialogTitle: 'Elegir backup de Fitki (.db)',
+      dialogTitle: 'Elegir backup de Fitki (.zip)',
       type: FileType.custom,
-      allowedExtensions: ['db'],
+      allowedExtensions: ['zip', 'db'],
     );
     final ruta = archivo?.path;
     if (ruta == null) return;
@@ -359,8 +359,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Genera una copia del archivo .db de Fitki y compártela donde '
-              'quieras (Drive, WhatsApp, gestor de archivos…).',
+              'Genera una copia de tus datos (la base y los comprobantes '
+              'adjuntos) en un archivo .zip y compártela donde quieras (Drive, '
+              'WhatsApp, gestor de archivos…).',
               style: Theme.of(context).textTheme.bodySmall!.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -382,8 +383,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Reemplaza todos los datos actuales por los del archivo .db '
-              'elegido. No se puede deshacer y se pregunta antes de continuar.',
+              'Reemplaza todos los datos actuales (base y comprobantes) por los '
+              'del archivo .zip elegido. No se puede deshacer y se pregunta '
+              'antes de continuar.',
               style: Theme.of(context).textTheme.bodySmall!.copyWith(
                 color: AppColors.textSecondary,
               ),

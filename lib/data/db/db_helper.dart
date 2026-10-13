@@ -34,9 +34,17 @@ class DbHelper {
     return _database!;
   }
 
+  /// Ruta de la base a abrir. En producción es `null` y se deriva de
+  /// `getDatabasesPath()`. Los tests lo fijan a una base aislada (p. ej. en
+  /// memoria) para que varios archivos de test no compitan por el mismo
+  /// `fitki.db` en disco.
+  static String? rutaParaTests;
+
   /// Ruta del archivo .db actual (la misma que usa [database] para abrir la
   /// conexión). Es útil para copiar el archivo completo (backup/restauración).
   static Future<String> getDatabasePath() async {
+    final override = rutaParaTests;
+    if (override != null) return override;
     return join(await sqflite.getDatabasesPath(), _dbName);
   }
 
@@ -295,6 +303,10 @@ class DbHelper {
   /// Vacía todas las tablas de la base (borra el contenido, conserva el
   /// esquema). Cada modelo expone su [tableName]; la lista se mantiene
   /// alineada con `_onCreate` para no olvidar tablas nuevas.
+  ///
+  /// Además reinicia los contadores AUTOINCREMENT (los ids vuelven a empezar
+  /// en 1) y compacta el archivo con `VACUUM`. Los comprobantes adjuntos son
+  /// archivos fuera de la base y se eliminan aparte (ver `borrarTodosLosDatos`).
   Future<void> vaciarDatos() async {
     final db = await database;
     final batch = db.batch();
@@ -318,6 +330,18 @@ class DbHelper {
     ]) {
       batch.execute('DELETE FROM $tabla');
     }
+    // `sqlite_sequence` solo existe si alguna tabla AUTOINCREMENT recibió al
+    // menos una fila; si nunca se insertó nada, no hay contadores que reiniciar.
+    final haySecuencia = await db.rawQuery(
+      "SELECT name FROM sqlite_master "
+      "WHERE type = 'table' AND name = 'sqlite_sequence'",
+    );
+    if (haySecuencia.isNotEmpty) {
+      batch.execute('DELETE FROM sqlite_sequence');
+    }
     await batch.commit(noResult: true);
+    // `VACUUM` recupera el espacio y reescribe el archivo compacto; debe
+    // correr fuera de la transacción del batch (SQLite no lo permite dentro).
+    await db.execute('VACUUM');
   }
 }
