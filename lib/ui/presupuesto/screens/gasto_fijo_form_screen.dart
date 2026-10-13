@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../data/models/asset.dart';
+import '../../../data/models/categoria_personalizada.dart';
 import '../../../data/models/gasto_fijo.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../logic/categorias/categoria_labels.dart';
@@ -35,6 +36,7 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen>
   final _nombreController = TextEditingController();
   final _montoController = TextEditingController();
   final _notasController = TextEditingController();
+  final _categoriaOtroController = TextEditingController();
 
   String _categoria = 'servicios';
   bool _montoVariable = false;
@@ -67,6 +69,7 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen>
     _nombreController.dispose();
     _montoController.dispose();
     _notasController.dispose();
+    _categoriaOtroController.dispose();
     super.dispose();
   }
 
@@ -85,10 +88,39 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen>
 
     final monto = milesADouble(_montoController.text) ?? 0;
     final ahora = DateTime.now();
+
+    // "Otro" tampoco se guarda como slug en un gasto fijo: el nombre escrito
+    // en su campo dedicado se convierte en la categoría real; si es nuevo se
+    // crea la personalizada y si coincide con una fija o existente se reutiliza.
+    var categoria = _categoria;
+    if (categoria == 'otro') {
+      final nombreNuevo = _categoriaOtroController.text.trim();
+      final personalizadas =
+          ref.read(categoriasPersonalizadasStreamProvider).value ??
+              const <CategoriaPersonalizada>[];
+      var resuelta = resolverCategoriaDeNombre(
+        nombre: nombreNuevo,
+        tipo: 'gasto',
+        existentes: personalizadas,
+      );
+      if (resuelta == nombreNuevo && nombreNuevo.isNotEmpty) {
+        await ref.read(categoriaPersonalizadaRepositoryProvider).insert(
+              CategoriaPersonalizada(
+                nombre: nombreNuevo,
+                icono: 'category_rounded',
+                tipo: 'gasto',
+              ),
+            );
+        ref.invalidate(categoriasPersonalizadasStreamProvider);
+        resuelta = nombreNuevo;
+      }
+      categoria = resuelta;
+    }
+
     final gasto = GastoFijo(
       id: widget.gasto?.id,
       nombre: _nombreController.text.trim(),
-      categoria: _categoria,
+      categoria: categoria,
       montoEstimado: monto,
       diaPago: _diaPago,
       activoId: activoId,
@@ -204,6 +236,31 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen>
                       )
                       .toList(),
                   onChanged: (v) => setState(() => _categoria = v ?? _categoria),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: _categoria == 'otro'
+                      ? Padding(
+                          key: const ValueKey('campo-categoria-otro'),
+                          padding: const EdgeInsets.only(top: 12),
+                          child: TextFormField(
+                            controller: _categoriaOtroController,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              labelText: 'Nombre de la categoría *',
+                              hintText: 'Ej: Mascotas, Gimnasio, Becas',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Escribe el nombre de la nueva categoría';
+                              }
+                              return null;
+                            },
+                          ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -366,20 +423,23 @@ class _Tarjeta extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            titulo,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              titulo,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
       ),
     );
   }

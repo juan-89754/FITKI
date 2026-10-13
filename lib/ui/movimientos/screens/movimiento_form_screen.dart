@@ -37,6 +37,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
   final _formKey = GlobalKey<FormState>();
   final _montoController = TextEditingController();
   final _notaController = TextEditingController();
+  final _categoriaOtroController = TextEditingController();
 
   String _tipo = 'gasto';
   String _categoria = 'alimentacion';
@@ -71,6 +72,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
   void dispose() {
     _montoController.dispose();
     _notaController.dispose();
+    _categoriaOtroController.dispose();
     super.dispose();
   }
 
@@ -130,17 +132,17 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
 
     final monto = milesADouble(_montoController.text) ?? 0;
 
-    // "Otro" ya no se guarda como slug: el texto del campo se convierte en la
-    // categoría real del movimiento. Si es un nombre nuevo se crea la
-    // categoría personalizada (así aparece en "Categorías" y en los dropdowns);
-    // si coincide con una fija o una ya creada, se reutiliza la existente.
+    // "Otro" nunca se guarda como slug: el nombre escrito en su campo dedicado
+    // se convierte en la categoría real del movimiento. Si es un nombre nuevo
+    // se crea la categoría personalizada (así aparece en "Categorías" y en los
+    // dropdowns); si coincide con una fija o una ya creada, se reutiliza la
+    // existente. La nota queda como nota, sin usarse para la categoría.
     var categoria = _categoria;
     String? nota = _notaController.text.trim().isEmpty
         ? null
         : _notaController.text.trim();
     if (_categoria == 'otro') {
-      final nombreNuevo = _notaController.text.trim();
-      nota = null;
+      final nombreNuevo = _categoriaOtroController.text.trim();
       final personalizadas = ref
               .read(categoriasPersonalizadasStreamProvider)
               .value ??
@@ -352,9 +354,9 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
               switchOutCurve: Curves.easeIn,
               child: _categoria == 'otro'
                   ? TextFormField(
-                      key: const ValueKey('especificar-otro'),
-                      controller: _notaController,
-                      maxLines: 3,
+                      key: const ValueKey('campo-categoria-otro'),
+                      controller: _categoriaOtroController,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
                         labelText: 'Nombre de la categoría *',
                         hintText: 'Ej: Mascotas, Gimnasio, Becas',
@@ -367,16 +369,18 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
                         return null;
                       },
                     )
-                  : TextFormField(
-                      key: const ValueKey('nota-opcional'),
-                      controller: _notaController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Nota (opcional)',
-                        hintText: 'Detalles adicionales...',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
+                  : const SizedBox.shrink(),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey('nota-opcional'),
+              controller: _notaController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Nota (opcional)',
+                hintText: 'Detalles adicionales...',
+                alignLabelWithHint: true,
+              ),
             ),
             const SizedBox(height: 32),
             FilledButton(
