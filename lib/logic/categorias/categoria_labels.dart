@@ -172,3 +172,30 @@ List<String> categoriasDeTipo(
   }
   return resultado;
 }
+
+/// Resuelve el texto que el usuario escribe al elegir "Otro" en un formulario
+/// a la categoría que realmente debe quedar en el movimiento/gasto.
+///
+/// Si el texto coincide con una categoría fija (por su slug o por su etiqueta,
+/// ignorando mayúsculas) devuelve su slug; si coincide con una personalizada
+/// existente devuelve su nombre guardado; si es un nombre nuevo, devuelve el
+/// nombre tal cual (la capa de UI lo persiste como [CategoriaPersonalizada]).
+String resolverCategoriaDeNombre({
+  required String nombre,
+  required String tipo,
+  required List<CategoriaPersonalizada> existentes,
+}) {
+  final base = nombre.trim().toLowerCase();
+  final fijas = tipo == 'ingreso' ? categoriasIngreso : categoriasGasto;
+  for (final fija in fijas) {
+    if (fija.toLowerCase() == base) return fija;
+    if (labelCategoria(fija).toLowerCase() == base) return fija;
+  }
+  for (final personalizada in existentes) {
+    if (personalizada.tipo == tipo &&
+        personalizada.nombre.toLowerCase() == base) {
+      return personalizada.nombre;
+    }
+  }
+  return nombre.trim();
+}

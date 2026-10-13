@@ -130,6 +130,40 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
 
     final monto = milesADouble(_montoController.text) ?? 0;
 
+    // "Otro" ya no se guarda como slug: el texto del campo se convierte en la
+    // categoría real del movimiento. Si es un nombre nuevo se crea la
+    // categoría personalizada (así aparece en "Categorías" y en los dropdowns);
+    // si coincide con una fija o una ya creada, se reutiliza la existente.
+    var categoria = _categoria;
+    String? nota = _notaController.text.trim().isEmpty
+        ? null
+        : _notaController.text.trim();
+    if (_categoria == 'otro') {
+      final nombreNuevo = _notaController.text.trim();
+      nota = null;
+      final personalizadas = ref
+              .read(categoriasPersonalizadasStreamProvider)
+              .value ??
+          const <CategoriaPersonalizada>[];
+      var resuelta = resolverCategoriaDeNombre(
+        nombre: nombreNuevo,
+        tipo: _tipo,
+        existentes: personalizadas,
+      );
+      if (resuelta == nombreNuevo && nombreNuevo.isNotEmpty) {
+        await ref.read(categoriaPersonalizadaRepositoryProvider).insert(
+              CategoriaPersonalizada(
+                nombre: nombreNuevo,
+                icono: 'category_rounded',
+                tipo: _tipo,
+              ),
+            );
+        ref.invalidate(categoriasPersonalizadasStreamProvider);
+        resuelta = nombreNuevo;
+      }
+      categoria = resuelta;
+    }
+
     String? comprobantePath = _comprobantePathActual;
     String? comprobanteNombre = _comprobanteNombreActual;
     String? comprobanteMime = _comprobanteMimeActual;
@@ -154,12 +188,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
       id: widget.movimiento?.id,
       tipo: _tipo,
       monto: monto,
-      categoria: _categoria,
+      categoria: categoria,
       fecha: _fecha,
       activoId: _activoId,
-      nota: _notaController.text.trim().isEmpty
-          ? null
-          : _notaController.text.trim(),
+      nota: nota,
       fechaCreacion: widget.movimiento?.fechaCreacion ?? DateTime.now(),
       comprobantePath: comprobantePath,
       comprobanteNombre: comprobanteNombre,
@@ -324,13 +356,13 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
                       controller: _notaController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Especifica qué fue *',
-                        hintText: 'Detalle del ingreso o gasto',
+                        labelText: 'Nombre de la categoría *',
+                        hintText: 'Ej: Mascotas, Gimnasio, Becas',
                         alignLabelWithHint: true,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Especifica qué fue este movimiento';
+                          return 'Escribe el nombre de la nueva categoría';
                         }
                         return null;
                       },
