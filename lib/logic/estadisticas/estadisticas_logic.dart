@@ -1,4 +1,5 @@
 import '../../data/models/asset.dart';
+import '../../data/models/loan.dart';
 import '../../data/models/transaction.dart';
 import '../../data/models/financial_goal.dart';
 import '../../data/models/debt.dart';
@@ -35,8 +36,10 @@ class ProgresoMetas {
 }
 
 class EstadisticasDatos {
-  final double patrimonioTotal;
-  final double balanceMes;
+  /// Patrimonio total y balance del mes, desglosados por moneda. No se suman
+  /// monedas distintas: cada una se muestra en su propia cifra.
+  final Map<String, double> patrimonioTotal;
+  final Map<String, double> balanceMes;
   final double ingresosMes;
   final double gastosMes;
   final List<GastoCategoria> gastosPorCategoria;
@@ -77,6 +80,9 @@ class EstadisticasLogic {
     final Map<String, double> acumulador = {};
     for (final movimiento in movimientos) {
       if (movimiento.tipo != 'gasto') continue;
+      // Un préstamo a terceros no es gasto de consumo: es una salida que se
+      // espera recuperar. No ensucia la distribución de gastos por categoría.
+      if (movimiento.categoria == Loan.categoriaPrestamo) continue;
       if (!_esDelMes(movimiento.fecha, referencia)) continue;
       acumulador[movimiento.categoria] =
           (acumulador[movimiento.categoria] ?? 0) + movimiento.monto;

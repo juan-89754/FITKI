@@ -2,13 +2,6 @@ import '../../data/models/abono_meta.dart';
 import '../../data/models/asset.dart';
 import '../../data/models/investment.dart';
 
-class PatrimonioPorMoneda {
-  final String moneda;
-  final double total;
-
-  const PatrimonioPorMoneda({required this.moneda, required this.total});
-}
-
 /// Cada activo maneja dos saldos, y esta es la única regla que los define:
 ///
 /// - **Saldo Total** (`Asset.montoDisponible`): todo el dinero que hay en la
@@ -21,28 +14,17 @@ class PatrimonioPorMoneda {
 /// el saldo de un activo nunca se desincroniza de su historial de movimientos:
 /// las metas solo afectan la disponibilidad, nunca el saldo real.
 class ActivosLogic {
-  static List<PatrimonioPorMoneda> calcularPatrimonioPorMoneda(
-    List<Asset> activos,
-  ) {
-    final Map<String, double> totales = {};
-
+  /// Suma de los saldos **totales** por moneda: incluye el dinero apartado en
+  /// metas, porque sigue siendo del usuario y sigue en la cuenta. Cada moneda
+  /// va en su propia cuenta: sumarlas sin conversión sería mostrar como
+  /// comparable dinero que no lo es.
+  static Map<String, double> patrimonioTotalPorMoneda(List<Asset> activos) {
+    final porMoneda = <String, double>{};
     for (final asset in activos) {
-      final moneda = asset.moneda;
-      totales[moneda] = (totales[moneda] ?? 0) + asset.montoDisponible;
+      porMoneda[asset.moneda] =
+          (porMoneda[asset.moneda] ?? 0) + asset.montoDisponible;
     }
-
-    return totales.entries
-        .map((e) => PatrimonioPorMoneda(moneda: e.key, total: e.value))
-        .toList()
-      ..sort((a, b) => a.moneda.compareTo(b.moneda));
-  }
-
-  static double calcularPatrimonioTotal(List<Asset> activos) {
-    double total = 0;
-    for (final asset in activos) {
-      total += asset.montoDisponible;
-    }
-    return total;
+    return porMoneda;
   }
 
   /// Dinero de [activoId] que está reservado en metas: la suma con signo de

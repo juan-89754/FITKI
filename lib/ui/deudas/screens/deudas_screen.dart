@@ -330,6 +330,9 @@ class _AlertaCargaDeuda extends StatelessWidget {
     if (carga == null) return const SizedBox.shrink();
 
     const currency = AppFormat.moneda;
+    final porcentajeTexto = carga.porcentaje == null
+        ? '—'
+        : '${carga.porcentaje!.toStringAsFixed(0)}%';
 
     if (!carga.excedeUmbral) {
       return Container(
@@ -347,7 +350,7 @@ class _AlertaCargaDeuda extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Carga de deuda: ${carga.porcentaje.toStringAsFixed(0)}% '
+                'Carga de deuda: $porcentajeTexto '
                 'de tus ingresos del mes '
                 '(${currency(carga.cuotaMensualTotal)} en cuotas).',
                 style: Theme.of(context)
@@ -378,7 +381,7 @@ class _AlertaCargaDeuda extends StatelessWidget {
           Expanded(
             child: Text(
               'Alerta: tu carga de deuda es del '
-              '${carga.porcentaje.toStringAsFixed(0)}% de los ingresos del '
+              '${carga.porcentaje!.toStringAsFixed(0)}% de los ingresos del '
               'mes. Supera el umbral configurado del $umbral%.',
               style: Theme.of(context)
                   .textTheme

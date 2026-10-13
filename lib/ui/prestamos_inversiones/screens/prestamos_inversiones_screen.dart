@@ -143,7 +143,7 @@ class _PrestamosTab extends ConsumerWidget {
                 icon: Icons.currency_exchange_rounded,
                 iconColor: AppColors.primary,
                 iconBackground: AppColors.chipBackgroundPrimary,
-                label: 'Total prestado activo',
+                label: 'Total por cobrar',
                 valor: currency(totalActivo),
                 subtitulo: 'Préstamos pendientes de cobro',
               );

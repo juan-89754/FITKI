@@ -7,17 +7,13 @@ import '../../logic/activos/activos_logic.dart';
 import '../metas/metas_providers.dart';
 import '../prestamos_inversiones/prestamos_inversiones_providers.dart';
 
-final patrimonioProvider = Provider<List<PatrimonioPorMoneda>>((ref) {
+/// El patrimonio es la suma de los Saldos **Totales** por moneda: incluye el
+/// dinero que está apartado en metas, porque ese dinero sigue siendo tuyo y
+/// sigue en la cuenta. Para saber qué se puede gastar, ver
+/// [patrimonioDisponibleTotalProvider].
+final patrimonioTotalProvider = Provider<Map<String, double>>((ref) {
   final activos = ref.watch(activosStreamProvider).asData?.value ?? [];
-  return ActivosLogic.calcularPatrimonioPorMoneda(activos);
-});
-
-/// El patrimonio es la suma de los Saldos **Totales**: incluye el dinero que está
-/// apartado en metas, porque ese dinero sigue siendo tuyo y sigue en la cuenta.
-/// Para saber qué se puede gastar, ver [patrimonioDisponibleTotalProvider].
-final patrimonioTotalProvider = Provider<double>((ref) {
-  final activos = ref.watch(activosStreamProvider).asData?.value ?? [];
-  return ActivosLogic.calcularPatrimonioTotal(activos);
+  return ActivosLogic.patrimonioTotalPorMoneda(activos);
 });
 
 /// Activos con su Saldo Disponible calculado.
@@ -32,11 +28,15 @@ final activosConSaldoProvider = Provider<List<ActivoConSaldo>>((ref) {
       .toList();
 });
 
-/// Suma de los Saldos Disponibles: el dinero que todavía se puede gastar.
-final patrimonioDisponibleTotalProvider = Provider<double>((ref) {
-  return ref
-      .watch(activosConSaldoProvider)
-      .fold<double>(0, (suma, activo) => suma + activo.saldoDisponible);
+/// Suma de los Saldos Disponibles por moneda: el dinero que todavía se puede
+/// gastar, sin mezclar monedas.
+final patrimonioDisponibleTotalProvider = Provider<Map<String, double>>((ref) {
+  final porMoneda = <String, double>{};
+  for (final activo in ref.watch(activosConSaldoProvider)) {
+    porMoneda[activo.moneda] =
+        (porMoneda[activo.moneda] ?? 0) + activo.saldoDisponible;
+  }
+  return porMoneda;
 });
 
 /// Un activo con sus dos saldos.

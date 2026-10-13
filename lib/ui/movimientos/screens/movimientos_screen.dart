@@ -54,7 +54,13 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
                 final activos = activosAsync.asData?.value ?? const <Asset>[];
                 return Column(
                   children: [
-                    _ResumenBalance(movimientos: movimientos),
+                    _ResumenBalance(
+                      movimientos: movimientos,
+                      monedaDe: {
+                        for (final activo in activos)
+                          activo.id: activo.moneda,
+                      },
+                    ),
                     Expanded(
                       child: filtrados.isEmpty
                           ? _EstadoVacio(
@@ -271,15 +277,16 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
 
 class _ResumenBalance extends StatelessWidget {
   final List<Transaction> movimientos;
+  final Map<int?, String> monedaDe;
 
-  const _ResumenBalance({required this.movimientos});
+  const _ResumenBalance({required this.movimientos, required this.monedaDe});
 
   @override
   Widget build(BuildContext context) {
-    final ingresos = MovimientosLogic.totalIngresos(movimientos);
-    final gastos = MovimientosLogic.totalGastos(movimientos);
-    final balance = MovimientosLogic.balanceNeto(movimientos);
-    const currency = AppFormat.moneda;
+    final ingresos = MovimientosLogic.totalIngresos(movimientos, monedaDe);
+    final gastos = MovimientosLogic.totalGastos(movimientos, monedaDe);
+    final balance = MovimientosLogic.balanceNeto(ingresos, gastos);
+    final balanceEnRojo = balance.values.any((valor) => valor < 0);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -293,20 +300,20 @@ class _ResumenBalance extends StatelessWidget {
         children: [
           _ColumnaResumen(
             label: 'Ingresos',
-            value: currency(ingresos),
+            value: AppFormat.totalesEnLinea(ingresos),
             color: AppColors.primary,
           ),
           _separador(),
           _ColumnaResumen(
             label: 'Gastos',
-            value: currency(gastos),
+            value: AppFormat.totalesEnLinea(gastos),
             color: AppColors.coral,
           ),
           _separador(),
           _ColumnaResumen(
             label: 'Balance',
-            value: currency(balance),
-            color: balance >= 0 ? AppColors.primary : AppColors.coral,
+            value: AppFormat.totalesEnLinea(balance),
+            color: balanceEnRojo ? AppColors.coral : AppColors.primary,
           ),
         ],
       ),

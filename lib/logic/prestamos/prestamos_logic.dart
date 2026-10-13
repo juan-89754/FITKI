@@ -31,14 +31,15 @@ class PrestamosLogic {
       (prestamo.montoPrestado - prestamo.montoPagado)
           .clamp(0.0, double.infinity);
 
-  /// Total prestado "activo": suma de los montos de los préstamos que NO han
-  /// sido pagados por completo. Los pagados totalmente quedan excluidos ya
-  /// que el retorno esperado ya se materializó.
+  /// Total que todavía falta por recibir de los préstamos no saldados: la suma
+  /// de lo que RESTA cobrar de cada uno. No es la suma de lo prestado original,
+  /// porque lo ya reembolsado ya volvió a la cuenta; contarlo mostraría como
+  /// pendiente dinero que en realidad ya está de vuelta.
   static double totalPrestadoActivo(List<Loan> prestamos) {
     return prestamos
         .where((prestamo) => estadoDe(prestamo) != 'pagado_total')
         .fold<double>(0, (acumulado, prestamo) {
-      return acumulado + prestamo.montoPrestado;
+      return acumulado + montoRestante(prestamo);
     });
   }
 
