@@ -1,5 +1,7 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
+
+import '../../logic/categorias/categoria_labels.dart';
 import '../models/abono_meta.dart';
 import '../models/asset.dart';
 import '../models/transaction.dart';
@@ -25,7 +27,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 16;
+  static const int _dbVersion = 17;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -289,6 +291,77 @@ class DbHelper {
             AND activo_id NOT IN (SELECT id FROM ${Asset.tableName})
         ''');
       }
+    }
+    if (oldVersion < 17) {
+      // Antes, elegir "Otro" en un movimiento guardaba el slug 'otro' y el
+      // nombre que el usuario escribía quedaba atrapado en la nota, invisible
+      // como categoría. Esta migración crea esas categorías personalizadas
+      // (una por nombre y tipo únicos) y reasigna cada movimiento a la suya.
+      // Si el texto coincide con una fija o con una personalizada existente se
+      // reutiliza la existente sin crear filas nuevas. Los movimientos con
+      // 'otro' sin nota real quedan intactos; la nota y el resto del historial
+      // nunca se tocan.
+      await _migrarOtroACategorias(db);
+    }
+  }
+
+  /// Migración a la v17: convierte los movimientos guardados como 'otro' + nota
+  /// en categorías personalizadas reales. Comparte la lógica de coincidencia
+  /// con los formularios, para que una categoría que ya existía o que coincide
+  /// con una fija no se cree dos veces.
+  Future<void> _migrarOtroACategorias(sqflite.Database db) async {
+    final candidatos = await db.rawQuery(
+      'SELECT id, tipo, nota FROM ${Transaction.tableName} '
+      "WHERE categoria = 'otro'",
+    );
+    final conNombre = candidatos
+        .where((fila) {
+          final nota = fila['nota'] as String?;
+          final tipo = fila['tipo'] as String?;
+          return nota != null &&
+              nota.trim().isNotEmpty &&
+              (tipo == Transaction.tipoGasto ||
+                  tipo == Transaction.tipoIngreso);
+        })
+        .toList();
+    if (conNombre.isEmpty) return;
+
+    final existentes = (await db
+            .query(CategoriaPersonalizada.tableName))
+        .map(CategoriaPersonalizada.fromMap)
+        .toList();
+    // Nombres creados durante esta misma corrida: dos movimientos pueden usar
+    // la misma categoría nueva y no debe insertarse dos veces.
+    final creadas = <String>{};
+
+    for (final fila in conNombre) {
+      final id = fila['id'] as int;
+      final nota = (fila['nota'] as String).trim();
+      final tipo = fila['tipo'] as String;
+
+      final existente = categoriaCoincidenteDeNombre(
+        nombre: nota,
+        tipo: tipo,
+        existentes: existentes,
+      );
+      final clave = '$tipo|${nota.toLowerCase()}';
+      if (existente == null && !creadas.contains(clave)) {
+        await db.insert(
+          CategoriaPersonalizada.tableName,
+          CategoriaPersonalizada(
+            nombre: nota,
+            icono: 'category_rounded',
+            tipo: tipo,
+          ).toMap(),
+        );
+        creadas.add(clave);
+      }
+      await db.update(
+        Transaction.tableName,
+        {'categoria': existente ?? nota},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
     }
   }
 

@@ -173,14 +173,11 @@ List<String> categoriasDeTipo(
   return resultado;
 }
 
-/// Resuelve el texto que el usuario escribe al elegir "Otro" en un formulario
-/// a la categoría que realmente debe quedar en el movimiento/gasto.
-///
-/// Si el texto coincide con una categoría fija (por su slug o por su etiqueta,
-/// ignorando mayúsculas) devuelve su slug; si coincide con una personalizada
-/// existente devuelve su nombre guardado; si es un nombre nuevo, devuelve el
-/// nombre tal cual (la capa de UI lo persiste como [CategoriaPersonalizada]).
-String resolverCategoriaDeNombre({
+/// Categoría existente (fija o personalizada) cuyo nombre coincide con el
+/// texto, ignorando mayúsculas y espacios: devuelve el slug de la fija o el
+/// nombre guardado de la personalizada, o `null` si es un nombre nuevo que la
+/// capa de UI debe perseguir creando la categoría.
+String? categoriaCoincidenteDeNombre({
   required String nombre,
   required String tipo,
   required List<CategoriaPersonalizada> existentes,
@@ -197,5 +194,22 @@ String resolverCategoriaDeNombre({
       return personalizada.nombre;
     }
   }
-  return nombre.trim();
+  return null;
+}
+
+/// Resuelve el texto que el usuario escribe al elegir "Otro" en un formulario
+/// a la categoría que realmente debe quedar en el movimiento/gasto. Véase
+/// [categoriaCoincidenteDeNombre]: si hay coincidencia se devuelve esa
+/// categoría; si no, el nombre tal cual para que la UI lo persista.
+String resolverCategoriaDeNombre({
+  required String nombre,
+  required String tipo,
+  required List<CategoriaPersonalizada> existentes,
+}) {
+  return categoriaCoincidenteDeNombre(
+        nombre: nombre,
+        tipo: tipo,
+        existentes: existentes,
+      ) ??
+      nombre.trim();
 }

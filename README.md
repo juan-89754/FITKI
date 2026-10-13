@@ -143,7 +143,7 @@ Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de 
 - **Flutter 3** / **Dart SDK >= 3.3.0**
 - **Riverpod** para el estado y la inyección de dependencias
 - **go_router** con `StatefulShellRoute` para la navegación
-- **sqflite** como base de datos local (16 tablas, versión de esquema 16)
+- **sqflite** como base de datos local (16 tablas, versión de esquema 17)
 - **fl_chart** para los gráficos
 - **shared_preferences** para preferencias no sensibles
 - **image_picker** + **path_provider** para la foto de perfil
@@ -212,11 +212,11 @@ Plataformas con scaffolding en el repositorio: Android, iOS, Web, Windows, macOS
 
 Archivo único `fitki.db` con 16 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `inversiones_movimientos`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `gastos_fijos`, `pagos_gastos_fijos`, `presupuestos_activo`, `categorias_personalizadas` y `perfil`.
 
-El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 16), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
+El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 17: los movimientos antiguos guardados como "Otro" con una nota se convierten en categorías personalizadas reales), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
 
 ## Pruebas
 
-Siete archivos en `test/`, todos con pruebas que corren sin emulador ni red; las que tocan persistencia usan SQLite en memoria con `sqflite_common_ffi`:
+Siete archivos en `test/`, todos con pruebas que corren sin emulador ni red; las que tocan persistencia usan SQLite con `sqflite_common_ffi` (en memoria o en un archivo temporal para probar migraciones de esquema):
 
 - `test/widget_test.dart`: prueba de humo que verifica que la app arranca y renderiza la pantalla de inicio, y que volver de segundo plano no monta la pantalla de desbloqueo.
 - `test/navigation_test.dart`: la barra de las cuatro pestañas, el menú lateral y la apertura de cada sección de Configuración.
