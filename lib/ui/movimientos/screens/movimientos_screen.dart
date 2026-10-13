@@ -5,6 +5,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../logic/categorias/categoria_labels.dart';
@@ -63,8 +64,13 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
                     ),
                     Expanded(
                       child: filtrados.isEmpty
-                          ? _EstadoVacio(
-                              onAgregar: () => _abrirFormulario(context),
+                          ? EmptyState(
+                              icono: Icons.swap_horiz_rounded,
+                              titulo: 'No hay movimientos',
+                              descripcion: 'Registra tu primer ingreso o '
+                                  'gasto\npara comenzar.',
+                              etiquetaAccion: 'Agregar movimiento',
+                              onAccion: () => _abrirFormulario(context),
                             )
                           : ListView.separated(
                               controller: ref
@@ -360,58 +366,6 @@ class _ColumnaResumen extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
-
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.mintPale,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.swap_horiz_rounded,
-              size: 40,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No hay movimientos',
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Registra tu primer ingreso o gasto\npara comenzar.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleSmall!.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onAgregar,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Agregar movimiento'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
           ),
         ],

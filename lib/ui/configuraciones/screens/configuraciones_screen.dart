@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../data/preferences/app_preferences.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -11,8 +12,8 @@ import '../../home/tab_navigation.dart';
 import '../widgets/perfil_avatar.dart';
 
 /// Pantalla central de Configuraciones: une el perfil, las preferencias
-/// (apariencia, notificaciones y umbral de alerta de deuda) y el acceso a
-/// categorías, backup/restauración y "Acerca de".
+/// (apariencia y umbral de alerta de deuda) y el acceso a categorías,
+/// backup/restauración y "Acerca de".
 class ConfiguracionesScreen extends ConsumerStatefulWidget {
   const ConfiguracionesScreen({super.key});
 
@@ -22,9 +23,9 @@ class ConfiguracionesScreen extends ConsumerStatefulWidget {
 }
 
 class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
-  /// Versión mostrada en "Acerca de". Se mantiene alineada con el campo
-  /// `version` de pubspec.yaml; no se agrega package_info_plus todavía.
-  static const String _versionApp = '0.1.0';
+  /// Versión mostrada en "Acerca de", leída del propio paquete en tiempo de
+  /// ejecución (queda alineada con `version` de pubspec.yaml sin duplicarla).
+  String _versionApp = '';
 
   bool _cargandoUmbral = true;
   double _umbralCargaDeuda = AppPreferences.umbralCargaDeudaDefault;
@@ -32,15 +33,12 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
   /// referencia para descartar guardados no-op y para revertir el slider si
   /// un guardado falla.
   double _umbralGuardado = AppPreferences.umbralCargaDeudaDefault;
-  // ignore: unused_field
-  bool _cargandoNotificaciones = true;
-  bool _notificacionesHabilitadas = false;
 
   @override
   void initState() {
     super.initState();
     _cargarUmbral();
-    _cargarNotificaciones();
+    _cargarVersion();
   }
 
   Future<void> _cargarUmbral() async {
@@ -51,6 +49,16 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
       _umbralGuardado = umbral;
       _cargandoUmbral = false;
     });
+  }
+
+  Future<void> _cargarVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _versionApp = info.version);
+    } catch (_) {
+      // En tests o plataformas sin el plugin no hay versión disponible.
+    }
   }
 
   Future<void> _guardarUmbral(double valor) async {
@@ -74,34 +82,6 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
     }
   }
 
-  Future<void> _cargarNotificaciones() async {
-    final habilitadas = await AppPreferences.areNotificacionesHabilitadas();
-    if (!mounted) return;
-    setState(() {
-      _notificacionesHabilitadas = habilitadas;
-      _cargandoNotificaciones = false;
-    });
-  }
-
-  // ignore: unused_element
-  Future<void> _cambiarNotificaciones(bool valor) async {
-    final ultimoPersistido = _notificacionesHabilitadas;
-    try {
-      await AppPreferences.setNotificacionesHabilitadas(valor);
-      if (!mounted) return;
-      setState(() => _notificacionesHabilitadas = valor);
-    } catch (_) {
-      if (!mounted) return;
-      // Si el guardado falló, el switch vuelve al valor realmente persistido.
-      setState(() => _notificacionesHabilitadas = ultimoPersistido);
-      AppSnackbar.show(
-        context,
-        message: 'No se pudo guardar la preferencia, intenta de nuevo',
-        type: AppSnackbarType.error,
-      );
-    }
-  }
-
   void _mostrarAcercaDe() {
     showDialog<void>(
       context: context,
@@ -119,9 +99,9 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Finanzas personales sin complicaciones.\n\n'
-                'Versión $_versionApp',
+              Text(
+                'Finanzas personales sin complicaciones.'
+                '${_versionApp.isEmpty ? '' : '\n\nVersión $_versionApp'}',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -177,43 +157,6 @@ class _ConfiguracionesScreenState extends ConsumerState<ConfiguracionesScreen> {
                   subtitulo: 'Tema claro, oscuro y colores de la app',
                   onTap: () => context.push('/configuraciones/apariencia'),
                 ),
-                // TODO: reactivar cuando se implemente el motor de
-
-                // notificaciones (sección 18.9 del módulo de Configuraciones).
-                // Se oculta temporalmente el switch: la preferencia se sigue
-                // persistiendo en AppPreferences.notificacionesHabilitadas.
-                /*
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  indent: 64,
-                  color: AppColors.borderSubtle,
-                ),
-                SwitchListTile(
-                  value: _cargandoNotificaciones
-                      ? false
-                      : _notificacionesHabilitadas,
-                  activeTrackColor: AppColors.primary,
-                  secondary: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.chipBackgroundCoral,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.notifications_rounded,
-                      color: AppColors.coral,
-                      size: 20,
-                    ),
-                  ),
-                  title: const Text('Notificaciones'),
-                  subtitle: const Text(
-                    'Avisos y recordatorios de la app.',
-                  ),
-                  onChanged: _cargandoNotificaciones ? null : _cambiarNotificaciones,
-                ),
-                */
               ],
             ),
           ),

@@ -274,7 +274,7 @@ class _DatoResumen extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                    fontSize: 10,
+                    fontSize: 12,
                   ),
             ),
           ],
@@ -437,7 +437,7 @@ return Padding(
                       _abreviarMonto(value),
                       textAlign: TextAlign.right,
                       style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                            fontSize: 10,
+                            fontSize: 12,
                           ),
                     ),
                   );

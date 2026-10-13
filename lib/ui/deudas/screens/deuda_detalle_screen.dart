@@ -6,6 +6,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/detalle_fila.dart';
 import '../../../data/models/debt.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/transaction.dart';
@@ -486,26 +487,26 @@ class _PlanPagos extends StatelessWidget {
       valorCuota: deuda.valorCuota,
     );
 
-    final filas = <_FilaDesglose>[];
-    filas.add(_FilaDesglose(
+    final filas = <DetalleFila>[];
+    filas.add(DetalleFila(
       label: 'Monto inicial',
       value: currency(DeudasLogic.montoInicialOf(deuda)),
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Valor de la cuota',
       value: deuda.valorCuota != null
           ? currency(deuda.valorCuota!)
           : 'Sin cuota definida',
       valorGris: deuda.valorCuota == null,
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Tasa de interés',
       value: deuda.tasaInteres != null
           ? '${deuda.tasaInteres!.toStringAsFixed(1)}% anual'
           : 'No aplica',
       valorGris: deuda.tasaInteres == null,
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Cuotas restantes (aprox.)',
       value: cuotas == null
           ? 'No determinable'
@@ -513,7 +514,7 @@ class _PlanPagos extends StatelessWidget {
       destacado: cuotas != null,
       valorGris: cuotas == null,
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Próximo pago',
       value: deuda.fechaProximoPago == null
           ? 'Sin fecha'
@@ -522,7 +523,7 @@ class _PlanPagos extends StatelessWidget {
     ));
 
     if (deuda.montoPendiente <= 0) {
-      filas.add(const _FilaDesglose(
+      filas.add(const DetalleFila(
         label: 'Estado',
         value: 'Saldada',
         destacado: true,
@@ -558,50 +559,6 @@ class _PlanPagos extends StatelessWidget {
                         child: fila,
                       ))
                   .toList(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilaDesglose extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool destacado;
-  final bool valorGris;
-
-  const _FilaDesglose({
-    required this.label,
-    required this.value,
-    this.destacado = false,
-    this.valorGris = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall!
-              .copyWith(color: AppColors.textSecondary),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.titleSmall!.copyWith(
-              fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-              color: destacado
-                  ? AppColors.primary
-                  : (valorGris
-                      ? AppColors.textSecondary
-                      : AppColors.textPrimary),
             ),
           ),
         ),

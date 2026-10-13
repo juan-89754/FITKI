@@ -17,8 +17,8 @@ const _kActiveCircleSize = 44.0;
 /// Con los 11 módulos de la app la barra ya no entra en pantalla, así que no
 /// puede repartir el ancho con `Expanded`: cada ítem mide lo mismo y el conjunto
 /// se desliza. El ancho es el menor que deja leer "Configuración" y
-/// "Estadísticas" completas en la etiqueta de 10px, que son las dos más largas.
-const _kItemWidth = 84.0;
+/// "Estadísticas" completas en la etiqueta de 12px, que son las dos más largas.
+const _kItemWidth = 96.0;
 
 /// Barra de navegación inferior de la app.
 ///
@@ -217,7 +217,7 @@ class _ItemNav extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 12,
                   height: 1.1,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                   color: isActive ? AppColors.primary : AppColors.textSecondary,

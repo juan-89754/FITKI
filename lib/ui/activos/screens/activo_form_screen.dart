@@ -4,6 +4,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/abono_meta.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/investment.dart';
@@ -21,7 +22,8 @@ class ActivoFormScreen extends ConsumerStatefulWidget {
   ConsumerState<ActivoFormScreen> createState() => _ActivoFormScreenState();
 }
 
-class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
+class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _montoController = TextEditingController();
@@ -93,7 +95,9 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
 
   bool get _isEditing => widget.asset != null;
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final asset = Asset(
@@ -131,7 +135,8 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar activo' : 'Nuevo activo'),
@@ -258,7 +263,7 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
             ),
             const SizedBox(height: 32),
             FilledButton(
-              onPressed: _guardar,
+              onPressed: guardando ? null : _guardar,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.textOnPrimary,
@@ -274,6 +279,7 @@ class _ActivoFormScreenState extends ConsumerState<ActivoFormScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/quote_project.dart';
 import '../cotizaciones_providers.dart';
 
@@ -14,7 +15,8 @@ class ProyectoFormScreen extends ConsumerStatefulWidget {
   ConsumerState<ProyectoFormScreen> createState() => _ProyectoFormScreenState();
 }
 
-class _ProyectoFormScreenState extends ConsumerState<ProyectoFormScreen> {
+class _ProyectoFormScreenState extends ConsumerState<ProyectoFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _tituloController = TextEditingController();
   final _objetivoController = TextEditingController();
@@ -40,7 +42,8 @@ class _ProyectoFormScreenState extends ConsumerState<ProyectoFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar proyecto' : 'Nuevo proyecto'),
@@ -94,7 +97,7 @@ class _ProyectoFormScreenState extends ConsumerState<ProyectoFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _guardar,
+                  onPressed: guardando ? null : _guardar,
                   icon: const Icon(Icons.check_rounded),
                   label: Text(_editando ? 'Guardar cambios' : 'Crear proyecto'),
                   style: FilledButton.styleFrom(
@@ -111,10 +114,13 @@ class _ProyectoFormScreenState extends ConsumerState<ProyectoFormScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final actual = widget.proyecto;

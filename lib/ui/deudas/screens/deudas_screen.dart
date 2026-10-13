@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/debt.dart';
 import '../../../logic/carga_deuda.dart';
 import '../../../logic/deudas/deudas_logic.dart';
@@ -30,8 +31,11 @@ class DeudasScreen extends ConsumerWidget {
       body: deudasAsync.when(
         data: (deudas) {
           if (deudas.isEmpty) {
-            return _EstadoVacio(
-              onAgregar: () => _abrirFormulario(context, ref),
+            return const EmptyState(
+              icono: Icons.account_balance_wallet_rounded,
+              titulo: 'No tienes deudas registradas',
+              descripcion: 'Registra una deuda para seguir tu plan\n'
+                  'de pagos y tu carga financiera.',
             );
           }
           final activas = deudas
@@ -581,52 +585,4 @@ class _DeudaCard extends StatelessWidget {
   }
 }
 
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
 
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.account_balance_wallet_rounded,
-                size: 40,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes deudas registradas',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge!
-                  .copyWith(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Registra una deuda para seguir tu plan\nde pagos y tu carga financiera.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall!
-                  .copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

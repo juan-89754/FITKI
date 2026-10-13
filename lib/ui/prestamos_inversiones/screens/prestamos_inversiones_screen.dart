@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/loan.dart';
 import '../../../data/models/investment.dart';
 import '../../../logic/prestamos/prestamos_logic.dart';
@@ -120,8 +121,8 @@ class _PrestamosTab extends ConsumerWidget {
     return prestamosAsync.when(
       data: (prestamos) {
         if (prestamos.isEmpty) {
-          return const _EstadoVacio(
-            icon: Icons.handshake_rounded,
+          return const EmptyState(
+            icono: Icons.handshake_rounded,
             titulo: 'No tienes préstamos aún',
             descripcion:
                 'Registra dinero que prestaste a terceros\ny sigue sus pagos parciales.',
@@ -199,8 +200,8 @@ class _InversionesTab extends ConsumerWidget {
     return inversionesAsync.when(
       data: (inversiones) {
         if (inversiones.isEmpty) {
-          return const _EstadoVacio(
-            icon: Icons.trending_up_rounded,
+          return const EmptyState(
+            icono: Icons.trending_up_rounded,
             titulo: 'No tienes inversiones aún',
             descripcion:
                 'Registra tus inversiones y compara\nla ganancia proyectada con la real.',
@@ -756,53 +757,4 @@ class _ChipEstadoInversion extends StatelessWidget {
   }
 }
 
-class _EstadoVacio extends StatelessWidget {
-  final IconData icon;
-  final String titulo;
-  final String descripcion;
 
-  const _EstadoVacio({
-    required this.icon,
-    required this.titulo,
-    required this.descripcion,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 40, color: AppColors.primary),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              titulo,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              descripcion,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

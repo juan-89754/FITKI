@@ -295,8 +295,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           'Se borraron todos tus registros financieros y tu perfil: '
           'activos, movimientos, deudas, metas, préstamos, cotizaciones y '
           'presupuestos.\n\n'
-          'Tus preferencias de apariencia, seguridad (PIN), notificaciones '
-          'y umbral de alerta siguen intactas.',
+          'Tus preferencias de apariencia y umbral de alerta siguen intactas.',
     );
   }
 

@@ -5,6 +5,7 @@ import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/totales_por_moneda.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../activos_providers.dart';
@@ -105,7 +106,14 @@ class ActivosScreen extends ConsumerWidget {
           ),
           Expanded(
             child: activosAsync.isEmpty
-                ? _EstadoVacio(onAgregar: () => _abrirFormulario(context, ref))
+                ? EmptyState(
+                    icono: Icons.account_balance_rounded,
+                    titulo: 'No tienes activos registrados',
+                    descripcion: 'Agrega tu primera cuenta, billetera o '
+                        'efectivo\npara empezar a ver tu patrimonio.',
+                    etiquetaAccion: 'Agregar activo',
+                    onAccion: () => _abrirFormulario(context, ref),
+                  )
                 : ListView.separated(
                     controller: ref.read(
                       tabScrollControllersProvider,
@@ -237,61 +245,6 @@ class _PatrimonioHeader extends StatelessWidget {
       if (reservado != 0) reservados[entrada.key] = reservado;
     }
     return AppFormat.totalesEnLinea(reservados);
-  }
-}
-
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
-
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.account_balance_rounded,
-                size: 40,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes activos registrados',
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Agrega tu primera cuenta, billetera o efectivo\npara empezar a ver tu patrimonio.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAgregar,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Agregar activo'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

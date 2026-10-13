@@ -6,6 +6,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/quote_item.dart';
 import '../cotizaciones_providers.dart';
 
@@ -39,7 +40,8 @@ class ItemCotizacionFormScreen extends ConsumerStatefulWidget {
 }
 
 class _ItemCotizacionFormScreenState
-    extends ConsumerState<ItemCotizacionFormScreen> {
+    extends ConsumerState<ItemCotizacionFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _productoController = TextEditingController();
   final _cantidadController = TextEditingController(text: '1');
@@ -93,7 +95,8 @@ class _ItemCotizacionFormScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar item' : 'Agregar item'),
@@ -235,7 +238,7 @@ class _ItemCotizacionFormScreenState
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _guardar,
+              onPressed: guardando ? null : _guardar,
               icon: const Icon(Icons.check_rounded),
               label: Text(_editando ? 'Guardar cambios' : 'Agregar item'),
               style: FilledButton.styleFrom(
@@ -249,6 +252,7 @@ class _ItemCotizacionFormScreenState
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -334,7 +338,9 @@ class _ItemCotizacionFormScreenState
     );
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_tipoItem == QuoteItem.tipoServicio &&
