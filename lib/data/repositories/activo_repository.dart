@@ -6,7 +6,6 @@ import '../models/gasto_fijo.dart';
 import '../models/inversion_movimiento.dart';
 import '../models/investment.dart';
 import '../models/loan.dart';
-import '../models/presupuesto_activo.dart';
 import '../models/transaction.dart';
 import '../db/db_helper.dart';
 
@@ -85,12 +84,13 @@ class ActivoRepository {
     );
   }
 
-  /// Elimina el activo y su presupuesto del mes. Los gastos fijos que lo
-  /// respaldaban quedan sin activo en vez de desaparecer: así el usuario
-  /// puede reasignarlos a otra cuenta y no pierde la plantilla ni su
-  /// historial. Lo mismo con los préstamos a terceros, las metas e
-  /// inversiones, que quedan sin cuenta de origen pero conservan todo su
-  /// historial. Los movimientos no se tocan (son el historial del dinero).
+  /// Elimina el activo. Los gastos fijos que lo respaldaban quedan sin activo
+  /// en vez de desaparecer: así el usuario puede reasignarlos a otra cuenta y
+  /// no pierde la plantilla ni su historial. Lo mismo con los préstamos a
+  /// terceros, las metas e inversiones, que quedan sin cuenta de origen pero
+  /// conservan todo su historial. Los movimientos no se tocan (son el historial
+  /// del dinero). El presupuesto ya no cuelga de la cuenta: es por categoría,
+  /// así que no hay nada que borrar aquí.
   ///
   /// Las claves foráneas no están habilitadas en la conexión, así que las
   /// cascadas declaradas en el esquema se aplican aquí a mano. La lista tiene
@@ -100,11 +100,6 @@ class ActivoRepository {
   Future<int> delete(int id) async {
     final db = await _dbHelper.database;
     return db.transaction<int>((txn) async {
-      await txn.delete(
-        PresupuestoActivo.tableName,
-        where: 'activo_id = ?',
-        whereArgs: [id],
-      );
       await txn.update(
         GastoFijo.tableName,
         {'activo_id': null},

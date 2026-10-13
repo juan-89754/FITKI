@@ -1,28 +1,21 @@
 import '../../data/models/gasto_fijo.dart';
 import '../../data/models/loan.dart';
 import '../../data/models/pago_gasto_fijo.dart';
-import '../../data/models/presupuesto_activo.dart';
+import '../../data/models/presupuesto_categoria.dart';
 import '../../data/models/transaction.dart';
 
-/// El resultado de comparar el límite de un activo contra lo que realmente
-/// salió de él durante el mes.
+/// El resultado de comparar el límite de una categoría contra lo que se gastó
+/// de verdad en ella durante el mes.
 class ResumenPresupuesto {
-  final PresupuestoActivo presupuesto;
+  final PresupuestoCategoria presupuesto;
   final double gastado;
-
-  /// Lo que salió del activo en préstamos a terceros este mes. Se informa
-  /// aparte y NO engrosa [gastado]: prestar no es consumir, es dinero que se
-  /// espera recuperar, así que no debe consumir el límite del presupuesto.
-  final double prestado;
-
-  final List<GastoPorCategoria> porCategoria;
 
   const ResumenPresupuesto({
     required this.presupuesto,
     required this.gastado,
-    this.prestado = 0,
-    required this.porCategoria,
   });
+
+  String get categoria => presupuesto.categoria;
 
   double get limite => presupuesto.montoLimite;
 
@@ -45,20 +38,6 @@ class ResumenPresupuesto {
   }
 
   bool get superado => gastado > limite;
-}
-
-/// Un renglón del desglose por categoría. Es de solo lectura: refleja los
-/// movimientos reales del activo, no algo que el usuario declare.
-class GastoPorCategoria {
-  final String categoria;
-  final double monto;
-  final double porcentaje;
-
-  const GastoPorCategoria({
-    required this.categoria,
-    required this.monto,
-    required this.porcentaje,
-  });
 }
 
 /// Un pago pendiente del mes junto con su plantilla, listo para pintarse en
@@ -219,89 +198,93 @@ class GastosLogic {
         .fold<double>(0, (acc, p) => acc + (p.montoPagado ?? 0));
   }
 
-  /// Compara el límite de un presupuesto contra los movimientos de gasto que
-  /// salieron de ese activo en el mes.
-  static ResumenPresupuesto compararPresupuesto({
-    required PresupuestoActivo presupuesto,
+  /// Compara el límite de una categoría contra los movimientos de gasto de esa
+  /// categoría en el mes.
+  static ResumenPresupuesto compararPresupuestoCategoria({
+    required PresupuestoCategoria presupuesto,
     required List<Transaction> movimientos,
   }) {
-    final inicio = DateTime(presupuesto.anio, presupuesto.mes, 1);
-    final fin = DateTime(presupuesto.anio, presupuesto.mes + 1, 0);
-
-    final gastosDelActivo = movimientos.where(
-      (m) =>
-          m.tipo == tipoGasto &&
-          m.activoId == presupuesto.activoId &&
-          !m.fecha.isBefore(inicio) &&
-          !m.fecha.isAfter(fin),
+    final gastado = totalDeCategoria(
+      movimientos: movimientos,
+      categoria: presupuesto.categoria,
+      mes: presupuesto.mes,
+      anio: presupuesto.anio,
     );
-
-    double gastado = 0;
-    double prestado = 0;
-    final gastosDeConsumo = <Transaction>[];
-    for (final movimiento in gastosDelActivo) {
-      if (movimiento.categoria == Loan.categoriaPrestamo) {
-        prestado += movimiento.monto;
-        continue;
-      }
-      gastado += movimiento.monto;
-      gastosDeConsumo.add(movimiento);
-    }
-
-    return ResumenPresupuesto(
-      presupuesto: presupuesto,
-      gastado: gastado,
-      prestado: prestado,
-      porCategoria: desglosePorCategoria(gastosDeConsumo),
-    );
+    return ResumenPresupuesto(presupuesto: presupuesto, gastado: gastado);
   }
 
-  /// Agrupa los movimientos por categoría y ordena de mayor a menor. Es una
-  /// lectura de lo que ya pasó, no un plan: por eso no necesita compararse con
-  /// ningún estimado.
-  static List<GastoPorCategoria> desglosePorCategoria(
-    List<Transaction> movimientos,
-  ) {
-    final porCategoria = <String, double>{};
+  /// Suma lo gastado en una categoría concreta dentro de un mes.
+  static double totalDeCategoria({
+    required List<Transaction> movimientos,
+    required String categoria,
+    required int mes,
+    required int anio,
+  }) {
+    final inicio = DateTime(anio, mes, 1);
+    final fin = DateTime(anio, mes + 1, 0);
+    var total = 0.0;
     for (final movimiento in movimientos) {
       if (movimiento.tipo != tipoGasto) continue;
-      if (movimiento.categoria == Loan.categoriaPrestamo) continue;
-      porCategoria[movimiento.categoria] =
-          (porCategoria[movimiento.categoria] ?? 0) + movimiento.monto;
+      if (movimiento.categoria != categoria) continue;
+      if (movimiento.fecha.isBefore(inicio) || movimiento.fecha.isAfter(fin)) {
+        continue;
+      }
+      total += movimiento.monto;
     }
-    final total = porCategoria.values.fold<double>(0, (acc, v) => acc + v);
-    final renglones = porCategoria.entries.map((e) {
-      final porcentaje = total <= 0 ? 0.0 : (e.value / total) * 100;
-      return GastoPorCategoria(
-        categoria: e.key,
-        monto: e.value,
-        porcentaje: porcentaje,
-      );
-    }).toList();
-    renglones.sort((a, b) => b.monto.compareTo(a.monto));
-    return renglones;
+    return total;
   }
 
-  /// Cuánto se ha gastado del mes en cada activo, para que la lista de
-  /// presupuestos de la app muestre de un vistazo cuál se está yendo más.
-  static Map<int, double> gastadoPorActivo({
+  /// Cuánto se gastó en el mes en cada categoría. Es lo que permite listar las
+  /// categorías que todavía no tienen presupuesto con su gasto real al lado, y
+  /// sugieren solas cuáles conviene asignar. Los préstamos a terceros se
+  /// excluyen: prestar no es consumir.
+  static Map<String, double> gastadoPorCategoria({
     required List<Transaction> movimientos,
     required int mes,
     required int anio,
   }) {
     final inicio = DateTime(anio, mes, 1);
     final fin = DateTime(anio, mes + 1, 0);
-    final resultado = <int, double>{};
+    final resultado = <String, double>{};
     for (final movimiento in movimientos) {
       if (movimiento.tipo != tipoGasto) continue;
       if (movimiento.categoria == Loan.categoriaPrestamo) continue;
       if (movimiento.fecha.isBefore(inicio) || movimiento.fecha.isAfter(fin)) {
         continue;
       }
-      final activoId = movimiento.activoId;
-      if (activoId == null) continue;
-      resultado[activoId] = (resultado[activoId] ?? 0) + movimiento.monto;
+      resultado[movimiento.categoria] =
+          (resultado[movimiento.categoria] ?? 0) + movimiento.monto;
     }
     return resultado;
+  }
+
+  /// Promedio mensual de lo gastado en una categoría en los [meses] meses
+  /// anteriores al mes pedido (sin incluirlo). Es la base con la que el
+  /// formulario propone un límite con datos reales en vez de inventar la cifra;
+  /// un gasto fijo entra solo porque al pagarse genera su movimiento. Devuelve
+  /// null cuando no hay historial: sin nada contra lo que comparar, un 0
+  /// mentiría.
+  static double? promedioMensualCategoria({
+    required List<Transaction> movimientos,
+    required String categoria,
+    required int mes,
+    required int anio,
+    int meses = 3,
+  }) {
+    final porPeriodo = <int, double>{};
+    for (var i = 1; i <= meses; i++) {
+      final fecha = DateTime(anio, mes - i, 1);
+      porPeriodo[fecha.year * 100 + fecha.month] = 0;
+    }
+    for (final movimiento in movimientos) {
+      if (movimiento.tipo != tipoGasto) continue;
+      if (movimiento.categoria != categoria) continue;
+      final clave = movimiento.fecha.year * 100 + movimiento.fecha.month;
+      if (!porPeriodo.containsKey(clave)) continue;
+      porPeriodo[clave] = porPeriodo[clave]! + movimiento.monto;
+    }
+    final conGasto = porPeriodo.values.where((v) => v > 0).toList();
+    if (conGasto.isEmpty) return null;
+    return conGasto.fold<double>(0, (acc, v) => acc + v) / conGasto.length;
   }
 }

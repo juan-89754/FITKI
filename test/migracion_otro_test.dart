@@ -12,7 +12,7 @@ import 'package:fitki/data/models/investment.dart';
 import 'package:fitki/data/models/loan.dart';
 import 'package:fitki/data/models/pago_gasto_fijo.dart';
 import 'package:fitki/data/models/perfil.dart';
-import 'package:fitki/data/models/presupuesto_activo.dart';
+import 'package:fitki/data/models/presupuesto_categoria.dart';
 import 'package:fitki/data/models/quote.dart';
 import 'package:fitki/data/models/quote_item.dart';
 import 'package:fitki/data/models/quote_project.dart';
@@ -21,17 +21,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Transaction;
 
-/// Migración v16 → v17: los movimientos guardados como 'otro' + nota se
-/// convierten en categorías personalizadas reales.
+/// Migración v16 → v17 (y de paso hasta la v18): los movimientos guardados como
+/// 'otro' + nota se convierten en categorías personalizadas reales.
 ///
 /// La prueba construye una base real en disco con el esquema de la v16, siembra
 /// movimientos 'otro' (con y sin nota) y luego la reabre con `DbHelper`, que
-/// ejecuta la migración. Protege que: se creen las categorías nuevas, se
-/// reutilicen las fijas y las existentes, no se dupliquen nombres dentro de la
-/// misma corrida, y que las filas sin nombre queden intactas.
+/// ejecuta todas las migraciones pendientes. Protege que: se creen las
+/// categorías nuevas, se reutilicen las fijas y las existentes, no se dupliquen
+/// nombres dentro de la misma corrida, las filas sin nombre queden intactas y la
+/// v18 deje el presupuesto por categoría en su sitio.
 void main() {
   late Directory dir;
   late String ruta;
+
+  /// Esquema exacto que la v9 creaba para el presupuesto por activo. El modelo
+  /// ya no existe (la v18 lo reemplaza por el de categoría), pero sembrar una
+  /// base v16 real exige esta tabla, así que va como SQL literal.
+  const presupuestosActivoSQL = '''
+    CREATE TABLE presupuestos_activo (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      activo_id INTEGER NOT NULL,
+      mes INTEGER NOT NULL,
+      anio INTEGER NOT NULL,
+      monto_limite REAL NOT NULL,
+      fecha_creacion TEXT NOT NULL,
+      UNIQUE (activo_id, mes, anio)
+    )
+  ''';
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -69,7 +85,7 @@ void main() {
             QuoteItem.createTableSQL,
             GastoFijo.createTableSQL,
             PagoGastoFijo.createTableSQL,
-            PresupuestoActivo.createTableSQL,
+            presupuestosActivoSQL,
             CategoriaPersonalizada.createTableSQL,
             Perfil.createTableSQL,
           ]) {
@@ -143,10 +159,10 @@ void main() {
     await sembrarVersion16();
 
     final helper = DbHelper();
-    final db = await helper.database; // ejecuta la migración a v17
+    final db = await helper.database; // ejecuta las migraciones pendientes
 
     final porNota = await categoriasPorNota(db);
-    expect(await db.getVersion(), 17);
+    expect(await db.getVersion(), 18);
     expect(porNota['Mascotas'], 'Mascotas');
     expect(porNota['mascotas'], 'Mascotas');
     expect(porNota['Transporte'], 'transporte');
@@ -190,10 +206,19 @@ void main() {
     expect(porNombreTipo['gasto|Gimnasio'], 'category_rounded');
     expect(porNombreTipo['ingreso|gimnasio'], 'category_rounded');
 
+    // La v18 reemplaza el presupuesto por activo por el de categoría: la tabla
+    // vieja desaparece y la nueva queda lista.
+    final tablas = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    );
+    final nombres = tablas.map((f) => f['name'] as String).toSet();
+    expect(nombres, contains(PresupuestoCategoria.tableName));
+    expect(nombres, isNot(contains('presupuestos_activo')));
+
     // Reabrir tras cerrar no vuelve a migrar ni duplica nada.
     await helper.close();
     final db2 = await DbHelper().database;
-    expect(await db2.getVersion(), 17);
+    expect(await db2.getVersion(), 18);
     expect(await db2.query(CategoriaPersonalizada.tableName), hasLength(4));
   });
 }

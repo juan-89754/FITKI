@@ -61,7 +61,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     // Los providers de Presupuesto y Gastos Fijos tienen su propia tabla y
     // además generan los pagos del mes a partir de sus plantillas; tras
     // restaurar o borrar hay que refrescarlos explícitamente.
-    ref.invalidate(presupuestosActivosStreamProvider);
+    ref.invalidate(presupuestosCategoriasStreamProvider);
     ref.invalidate(gastosFijosStreamProvider);
     ref.invalidate(pagosGastosFijosStreamProvider);
     ref.invalidate(pagosDelMesProvider);

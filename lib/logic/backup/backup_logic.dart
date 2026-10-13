@@ -55,6 +55,11 @@ const String _carpetaComprobantes = 'comprobantes';
 /// Un archivo solo se acepta como backup de Fitki si trae TODAS estas: son las
 /// que identifican el esquema y las que un backup antiguo también tiene.
 ///
+/// El presupuesto queda afuera a propósito: cambió de tabla entre versiones
+/// (`presupuestos_activo` hasta la v17, `presupuestos_categoria` desde la v18),
+/// así que no hay una que tengan TODOS los backups. La que corresponde al
+/// esquema actual se exige en [_tablasAgregadas], sobre la base ya migrada.
+///
 /// Las tablas de [_tablasAgregadas] NO se exigen en el archivo, porque un backup
 /// tomado antes de que existieran válidamente no las trae. Se crean solas al
 /// reabrir la base restaurada, que es cuando corren las migraciones; por eso
@@ -72,7 +77,6 @@ const Set<String> _tablasNucleo = {
   'items_cotizacion',
   'gastos_fijos',
   'pagos_gastos_fijos',
-  'presupuestos_activo',
   'categorias_personalizadas',
   'perfil',
 };
@@ -82,6 +86,7 @@ const Set<String> _tablasNucleo = {
 const Set<String> _tablasAgregadas = {
   'abonos_metas',
   'inversiones_movimientos',
+  'presupuestos_categoria',
 };
 
 /// Todas las tablas que [DbHelper] crea al inicializar.

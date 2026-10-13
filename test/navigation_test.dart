@@ -24,21 +24,21 @@ import 'package:fitki/ui/prestamos_inversiones/prestamos_inversiones_providers.d
 
 /// Regresiones del sistema de navegación.
 ///
-/// La app pasó de 4 pestañas + menú lateral a 11 módulos, todos en la barra
+/// La app pasó de 4 pestañas + menú lateral a 12 módulos, todos en la barra
 /// inferior y todos alcanzables deslizando. Lo que se vigila acá es lo que se
 /// rompió en cada paso de ese cambio: que las etiquetas entren completas, que la
 /// barra se desplace de verdad, que tocar un módulo change de rama y no apile
 /// una pantalla encima de otra, y que el botón atrás siga llevando a Inicio
 /// en vez de cerrar la app.
 ///
-/// Los tests de UI no pueden recorrer los 11 módulos: cada uno monta su pantalla
+/// Los tests de UI no pueden recorrer los 12 módulos: cada uno monta su pantalla
 /// y varias piden datos a la base, que no existe en `flutter test`. La lista
 /// completa se verifica sobre el árbol de widgets (el `Row` de la barra construye
 /// todos sus hijos, visibles o no) y el cambio de rama se comprueba con los
 /// destinos que ya sabíamos montar.
 Finder get barra => find.byType(AppBottomNav);
 
-/// Los 11 módulos: etiqueta de la barra y ruta de la rama, en el orden de
+/// Los 12 módulos: etiqueta de la barra y ruta de la rama, en el orden de
 /// `TabIndex`. Esta lista es la expectativa de dos cosas a la vez —el orden de
 /// la barra y el orden de las ramas del router—, así que si alguien agrega un
 /// módulo de un lado y no del otro, el test lo dice.
@@ -46,7 +46,8 @@ const _ramas = <(String, String)>[
   ('Inicio', '/'),
   ('Movimientos', '/movimientos'),
   ('Activos', '/activos'),
-  ('Gastos', '/gastos'),
+  ('Presupuesto', '/presupuesto'),
+  ('Gastos fijos', '/gastos-fijos'),
   ('Deudas', '/deudas'),
   ('Metas', '/metas'),
   ('Préstamos', '/prestamos-inversiones'),
@@ -58,12 +59,12 @@ const _ramas = <(String, String)>[
 
 /// Los destinos que se pueden montar en un test de widgets.
 ///
-/// "Gastos" queda afuera a propósito: la pantalla lee `gastosFijosStreamProvider`,
-/// `pagosGastosFijosStreamProvider`, `presupuestosActivosStreamProvider`,
-/// `resumenesPresupuestoProvider` y tres providers más, todos sobre sqflite. Sin
-/// base de datos real quedan promesas sin resolver y el test termina con timers
-/// pendientes. Su ruta la cubre el test de ramas de abajo, que no necesita
-/// montar nada.
+/// "Presupuesto" y "Gastos fijos" quedan afuera a propósito: sus pantallas leen
+/// `gastosFijosStreamProvider`, `pagosGastosFijosStreamProvider`,
+/// `presupuestosCategoriasStreamProvider`, `resumenesPresupuestoProvider` y
+/// otros providers sobre sqflite. Sin base de datos real quedan promesas sin
+/// resolver y el test termina con timers pendientes. Sus rutas las cubre el test
+/// de ramas de abajo, que no necesita montar nada.
 const _montables = {'Inicio', 'Movimientos', 'Activos', 'Deudas', 'Configuración'};
 
 Finder _scrollDeLaBarra() => find.descendant(
@@ -152,7 +153,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('la barra lista los 11 módulos sin recortes', (tester) async {
+  testWidgets('la barra lista los 12 módulos sin recortes', (tester) async {
     await pumpApp(tester);
 
     for (final rama in _ramas) {
@@ -163,7 +164,7 @@ void main() {
       );
     }
 
-    // El menú hamburguesa ya no existe: los 7 módulos que vivían ahí son
+    // El menú hamburguesa ya no existe: los 8 módulos que vivían ahí son
     // pestañas ahora.
     expect(find.byTooltip('Abrir menú'), findsNothing);
 
@@ -173,7 +174,7 @@ void main() {
   testWidgets('la barra se desliza y lleva el módulo activo a la vista', (
     tester,
   ) async {
-    // Superficie de teléfono: con el ancho por defecto de los tests (800) los 11
+    // Superficie de teléfono: con el ancho por defecto de los tests (800) los 12
     // módulos entrarían y no habría nada que deslizar.
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -190,12 +191,12 @@ void main() {
       reason: 'la barra tiene que ser un carrusel horizontal',
     );
 
-    // Los 11 módulos no entran: "Estadísticas" arranca fuera de la píldora.
+    // Los 12 módulos no entran: "Estadísticas" arranca fuera de la píldora.
     final barraRect = tester.getRect(barra);
     expect(
       tester.getRect(_etiqueta('Estadísticas')).left,
       greaterThan(barraRect.right),
-      reason: 'sin barra deslizable, los 11 módulos no entrarían',
+      reason: 'sin barra deslizable, los 12 módulos no entrarían',
     );
 
     final antes = tester.getTopLeft(_etiqueta('Estadísticas')).dx;
@@ -251,8 +252,8 @@ void main() {
   });
 
   // Un test por módulo. Antes iban todos en un solo `for`, y con que uno de los
-// once se quedara cargando, el `pumpAndSettle` lanzaba y los otros diez
-// aparecían como "no verificados" aunque estuvieran bien.
+  // doce se quedara cargando, el `pumpAndSettle` lanzaba y los otros once
+  // aparecían como "no verificados" aunque estuvieran bien.
 for (final etiqueta in _montables) {
   final ruta = _ramas.firstWhere((r) => r.$1 == etiqueta).$2;
 
@@ -283,14 +284,14 @@ for (final etiqueta in _montables) {
 
 // El orden de la barra y el de las ramas tienen que ser el mismo número: si no,
 // tocar "Metas" lleva a Deudas y el `PageView` muestra la pantalla que no es.
-// Este test no monta widgets, así que cubre los 11 módulos, incluso los que no
+// Este test no monta widgets, así que cubre los 12 módulos, incluso los que no
 // se pueden levantar sin base de datos.
-test('las 11 ramas del shell coinciden con los 11 módulos de la barra', () {
+test('las 12 ramas del shell coinciden con los 12 módulos de la barra', () {
   final shell = buildRouter().configuration.routes
       .whereType<StatefulShellRoute>()
       .single;
 
-  expect(shell.branches.length, 11);
+  expect(shell.branches.length, 12);
 
   final rutasDeLasRamas = shell.branches
       .map((rama) => rama.routes.whereType<GoRoute>().first.path)

@@ -15,7 +15,7 @@ import '../models/quote.dart';
 import '../models/quote_item.dart';
 import '../models/gasto_fijo.dart';
 import '../models/pago_gasto_fijo.dart';
-import '../models/presupuesto_activo.dart';
+import '../models/presupuesto_categoria.dart';
 import '../models/categoria_personalizada.dart';
 import '../models/perfil.dart';
 
@@ -27,7 +27,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 17;
+  static const int _dbVersion = 18;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -76,7 +76,7 @@ class DbHelper {
     batch.execute(QuoteItem.createTableSQL);
     batch.execute(GastoFijo.createTableSQL);
     batch.execute(PagoGastoFijo.createTableSQL);
-    batch.execute(PresupuestoActivo.createTableSQL);
+    batch.execute(PresupuestoCategoria.createTableSQL);
     batch.execute(CategoriaPersonalizada.createTableSQL);
     batch.execute(Perfil.createTableSQL);
 
@@ -142,7 +142,10 @@ class DbHelper {
       }
       await db.execute(GastoFijo.createTableSQL);
       await db.execute(PagoGastoFijo.createTableSQL);
-      await db.execute(PresupuestoActivo.createTableSQL);
+      // Aquí la v9 creaba el presupuesto por activo. Ese modelo ya no existe:
+      // la v18 descarta esa tabla y en su lugar crea el presupuesto por
+      // categoría. No se recrea porque una base que llegue hasta la versión
+      // actual nunca la necesita.
     }
     if (oldVersion < 10) {
       // Los abonos a las metas pasan a ser registros con historia propia: cada
@@ -303,6 +306,18 @@ class DbHelper {
       // nunca se tocan.
       await _migrarOtroACategorias(db);
     }
+    if (oldVersion < 18) {
+      // El presupuesto deja de ser un límite por cuenta y pasa a ser un límite
+      // por categoría: el plan ahora dice en qué se gasta, no de qué tarjeta se
+      // saca. Un límite por cuenta no se puede convertir en límites por
+      // categoría (son conceptos distintos), así que la tabla vieja se
+      // descarta. Los movimientos, que son el historial real del dinero, no se
+      // tocan. El nombre va como texto literal a propósito: el modelo
+      // PresupuestoActivo ya no existe en el código, pero una base vieja sí
+      // tiene esa tabla.
+      await db.execute('DROP TABLE IF EXISTS presupuestos_activo');
+      await db.execute(PresupuestoCategoria.createTableSQL);
+    }
   }
 
   /// Migración a la v17: convierte los movimientos guardados como 'otro' + nota
@@ -397,7 +412,7 @@ class DbHelper {
       QuoteItem.tableName,
       GastoFijo.tableName,
       PagoGastoFijo.tableName,
-      PresupuestoActivo.tableName,
+      PresupuestoCategoria.tableName,
       CategoriaPersonalizada.tableName,
       Perfil.tableName,
     ]) {

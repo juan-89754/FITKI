@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/gasto_fijo.dart';
 import '../../data/models/pago_gasto_fijo.dart';
-import '../../data/models/presupuesto_activo.dart';
+import '../../data/models/presupuesto_categoria.dart';
 import '../../data/models/transaction.dart';
 import '../../data/repositories/gasto_fijo_repository.dart';
 import '../../data/repositories/pago_gasto_fijo_repository.dart';
-import '../../data/repositories/presupuesto_activo_repository.dart';
+import '../../data/repositories/presupuesto_categoria_repository.dart';
 import '../../data/providers/shared_providers.dart';
 import '../../logic/gastos/gastos_logic.dart';
 import '../../logic/gastos/periodo.dart';
@@ -21,9 +21,9 @@ final pagoGastoFijoRepositoryProvider = Provider<PagoGastoFijoRepository>((
   return PagoGastoFijoRepository();
 });
 
-final presupuestoActivoRepositoryProvider =
-    Provider<PresupuestoActivoRepository>((ref) {
-      return PresupuestoActivoRepository();
+final presupuestoCategoriaRepositoryProvider =
+    Provider<PresupuestoCategoriaRepository>((ref) {
+      return PresupuestoCategoriaRepository();
     });
 
 /// Mes que están viendo las pantallas del módulo. Cambiarlo repinta tanto el
@@ -45,9 +45,9 @@ final pagosGastosFijosStreamProvider = StreamProvider<List<PagoGastoFijo>>((
   yield* streamDatosFiltrado(repo.getAll, (p) => p.toMap());
 });
 
-final presupuestosActivosStreamProvider =
-    StreamProvider<List<PresupuestoActivo>>((ref) async* {
-      final repo = ref.watch(presupuestoActivoRepositoryProvider);
+final presupuestosCategoriasStreamProvider =
+    StreamProvider<List<PresupuestoCategoria>>((ref) async* {
+      final repo = ref.watch(presupuestoCategoriaRepositoryProvider);
       yield* streamDatosFiltrado(repo.getAll, (p) => p.toMap());
     });
 
@@ -140,35 +140,95 @@ final movimientosDelMesProvider = FutureProvider<List<Transaction>>((
 });
 
 /// Resumen de cada presupuesto del mes visible: límite, gastado, restante y
-/// desglose por categoría.
+/// porcentaje de uso, ordenado por lo más gastado primero.
 final resumenesPresupuestoProvider = FutureProvider<List<ResumenPresupuesto>>((
   ref,
 ) async {
   final presupuestos =
-      ref.watch(presupuestosActivosStreamProvider).asData?.value ??
-      const <PresupuestoActivo>[];
+      ref.watch(presupuestosCategoriasStreamProvider).asData?.value ??
+      const <PresupuestoCategoria>[];
   final movimientos = await ref.watch(movimientosDelMesProvider.future);
   final periodo = ref.watch(periodoVisibleProvider);
 
-  return presupuestos
+  final resumenes = presupuestos
       .where((p) => p.mes == periodo.mes && p.anio == periodo.anio)
       .map(
-        (p) => GastosLogic.compararPresupuesto(
+        (p) => GastosLogic.compararPresupuestoCategoria(
           presupuesto: p,
           movimientos: movimientos,
         ),
       )
       .toList();
+  resumenes.sort((a, b) => b.gastado.compareTo(a.gastado));
+  return resumenes;
 });
 
-/// Lo que ya salió de cada activo este mes, para los activos que todavía no
-/// tienen presupuesto creado.
-final gastadoPorActivoMesProvider = FutureProvider<Map<int, double>>((ref) async {
+/// Lo que ya se gastó este mes en cada categoría, para las categorías que
+/// todavía no tienen presupuesto creado.
+final gastadoPorCategoriaMesProvider = FutureProvider<Map<String, double>>((
+  ref,
+) async {
   final movimientos = await ref.watch(movimientosDelMesProvider.future);
   final periodo = ref.watch(periodoVisibleProvider);
-  return GastosLogic.gastadoPorActivo(
+  return GastosLogic.gastadoPorCategoria(
     movimientos: movimientos,
     mes: periodo.mes,
     anio: periodo.anio,
+  );
+});
+
+/// Promedio mensual de los últimos 3 meses de gasto de una categoría, para
+/// proponer un límite con datos reales en vez de inventar la cifra. `null`
+/// cuando todavía no hay historial.
+final promedioCategoriaProvider = Provider.family<double?, String>((
+  ref,
+  categoria,
+) {
+  final movimientos =
+      ref.watch(movimientosStreamProvider).asData?.value ??
+      const <Transaction>[];
+  final periodo = ref.watch(periodoVisibleProvider);
+  return GastosLogic.promedioMensualCategoria(
+    movimientos: movimientos,
+    categoria: categoria,
+    mes: periodo.mes,
+    anio: periodo.anio,
+  );
+});
+
+/// Total presupuestado y gastado del mes visible, para el encabezado. Solo
+/// cuenta las categorías con presupuesto: es el plan contra la realidad.
+class TotalesPresupuesto {
+  final double presupuestado;
+  final double gastado;
+
+  const TotalesPresupuesto({
+    required this.presupuestado,
+    required this.gastado,
+  });
+
+  double get disponible => presupuestado - gastado;
+
+  bool get superado => gastado > presupuestado;
+
+  double get porcentaje {
+    if (presupuestado <= 0) return gastado > 0 ? 100 : 0;
+    return (gastado / presupuestado) * 100;
+  }
+}
+
+final totalesPresupuestoProvider = FutureProvider<TotalesPresupuesto>((
+  ref,
+) async {
+  final resumenes = await ref.watch(resumenesPresupuestoProvider.future);
+  var presupuestado = 0.0;
+  var gastado = 0.0;
+  for (final resumen in resumenes) {
+    presupuestado += resumen.limite;
+    gastado += resumen.gastado;
+  }
+  return TotalesPresupuesto(
+    presupuestado: presupuestado,
+    gastado: gastado,
   );
 });

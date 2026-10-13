@@ -1,7 +1,7 @@
 import 'package:fitki/data/models/gasto_fijo.dart';
 import 'package:fitki/data/models/loan.dart';
 import 'package:fitki/data/models/pago_gasto_fijo.dart';
-import 'package:fitki/data/models/presupuesto_activo.dart';
+import 'package:fitki/data/models/presupuesto_categoria.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/logic/gastos/gastos_logic.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -77,14 +77,14 @@ Transaction _movimiento({
   );
 }
 
-PresupuestoActivo _presupuesto({
-  int activoId = 1,
+PresupuestoCategoria _presupuesto({
+  String categoria = 'alimentacion',
   int mes = 3,
   int anio = 2026,
   required double limite,
 }) {
-  return PresupuestoActivo(
-    activoId: activoId,
+  return PresupuestoCategoria(
+    categoria: categoria,
     mes: mes,
     anio: anio,
     montoLimite: limite,
@@ -281,18 +281,26 @@ void main() {
     });
   });
 
-  group('compararPresupuesto y excedente', () {
-    test('suma solo los gastos del activo en el mes', () {
-      final resumen = GastosLogic.compararPresupuesto(
+  group('compararPresupuestoCategoria y excedente', () {
+    test('suma solo los gastos de esa categoría en el mes', () {
+      final resumen = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 100000),
         movimientos: [
           _movimiento(activoId: 1, monto: 30000),
-          _movimiento(activoId: 1, monto: 20000, fecha: DateTime(2026, 3, 28)),
-          // De otra cuenta: no va a este presupuesto.
-          _movimiento(activoId: 2, monto: 90000),
+          _movimiento(
+            activoId: 1,
+            monto: 20000,
+            fecha: DateTime(2026, 3, 28),
+          ),
+          // De otra categoría: no va a este presupuesto.
+          _movimiento(activoId: 1, monto: 90000, categoria: 'transporte'),
           // De otro mes: tampoco.
-          _movimiento(activoId: 1, monto: 50000, fecha: DateTime(2026, 2, 10)),
-          // Un ingreso del mismo activo tampoco es gasto.
+          _movimiento(
+            activoId: 1,
+            monto: 50000,
+            fecha: DateTime(2026, 2, 10),
+          ),
+          // Un ingreso tampoco es gasto.
           _movimiento(
             activoId: 1,
             monto: 70000,
@@ -308,7 +316,7 @@ void main() {
     });
 
     test('marca superado y reparte el restante en cero y el excedente', () {
-      final resumen = GastosLogic.compararPresupuesto(
+      final resumen = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 100000),
         movimientos: [_movimiento(activoId: 1, monto: 140000)],
       );
@@ -320,7 +328,7 @@ void main() {
     });
 
     test('calcula el porcentaje sobre el límite', () {
-      final resumen = GastosLogic.compararPresupuesto(
+      final resumen = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 200000),
         movimientos: [_movimiento(activoId: 1, monto: 50000)],
       );
@@ -329,11 +337,11 @@ void main() {
     });
 
     test('un límite en cero no divide por cero', () {
-      final conGasto = GastosLogic.compararPresupuesto(
+      final conGasto = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 0),
         movimientos: [_movimiento(activoId: 1, monto: 10000)],
       );
-      final sinGasto = GastosLogic.compararPresupuesto(
+      final sinGasto = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 0),
         movimientos: const [],
       );
@@ -342,10 +350,10 @@ void main() {
       expect(sinGasto.porcentaje, 0);
     });
 
-    test('el gasto puede superar el saldo de la cuenta sin recortarse', () {
-      // Regresión del clamp: una cuenta puede quedar en negativo y el
-      // presupuesto debe seguir reportando el gasto REAL, no el recortado.
-      final resumen = GastosLogic.compararPresupuesto(
+    test('el gasto puede superar el límite sin recortarse', () {
+      // Regresión del clamp: el presupuesto debe reportar el gasto REAL, no el
+      // recortado.
+      final resumen = GastosLogic.compararPresupuestoCategoria(
         presupuesto: _presupuesto(limite: 100000),
         movimientos: [_movimiento(activoId: 1, monto: 500000)],
       );
@@ -354,9 +362,9 @@ void main() {
       expect(resumen.excedido, 400000);
     });
 
-    test('un préstamo a terceros no consume el límite y se informa aparte', () {
-      final resumen = GastosLogic.compararPresupuesto(
-        presupuesto: _presupuesto(limite: 100000),
+    test('un préstamo a terceros no entra porque su categoría es otra', () {
+      final resumen = GastosLogic.compararPresupuestoCategoria(
+        presupuesto: _presupuesto(categoria: 'alimentacion', limite: 100000),
         movimientos: [
           _movimiento(activoId: 1, monto: 30000),
           _movimiento(
@@ -368,62 +376,39 @@ void main() {
       );
 
       expect(resumen.gastado, 30000);
-      expect(resumen.prestado, 200000);
       expect(resumen.superado, isFalse);
-      expect(
-        resumen.porCategoria.map((r) => r.categoria),
-        isNot(contains(Loan.categoriaPrestamo)),
-      );
     });
   });
 
-  group('desglosePorCategoria', () {
-    test('agrupa, ordena de mayor a menor y reparte porcentajes', () {
-      final renglones = GastosLogic.desglosePorCategoria([
-        _movimiento(activoId: 1, monto: 20000, categoria: 'alimentacion'),
-        _movimiento(activoId: 1, monto: 50000, categoria: 'servicios'),
-        _movimiento(activoId: 1, monto: 30000, categoria: 'alimentacion'),
-      ]);
-
-      expect(renglones.map((r) => r.categoria), ['alimentacion', 'servicios']);
-      expect(renglones.first.monto, 50000);
-      expect(renglones.first.porcentaje, closeTo(50, 0.001));
-      expect(renglones.last.porcentaje, closeTo(50, 0.001));
-    });
-
-    test('ignora ingresos', () {
-      final renglones = GastosLogic.desglosePorCategoria([
-        _movimiento(
-          activoId: 1,
-          monto: 90000,
-          tipo: Transaction.tipoIngreso,
-          categoria: 'sueldo',
-        ),
-      ]);
-
-      expect(renglones, isEmpty);
-    });
-  });
-
-  group('gastadoPorActivo', () {
-    test('acumula por activo solo en el mes pedido', () {
-      final resultado = GastosLogic.gastadoPorActivo(
+  group('gastadoPorCategoria', () {
+    test('acumula por categoría solo en el mes pedido', () {
+      final resultado = GastosLogic.gastadoPorCategoria(
         movimientos: [
-          _movimiento(activoId: 1, monto: 10000),
-          _movimiento(activoId: 1, monto: 15000, fecha: DateTime(2026, 3, 30)),
-          _movimiento(activoId: 2, monto: 20000),
-          _movimiento(activoId: 1, monto: 80000, fecha: DateTime(2026, 1, 5)),
+          _movimiento(activoId: 1, monto: 10000, categoria: 'alimentacion'),
+          _movimiento(
+            activoId: 1,
+            monto: 15000,
+            categoria: 'alimentacion',
+            fecha: DateTime(2026, 3, 30),
+          ),
+          _movimiento(activoId: 2, monto: 20000, categoria: 'transporte'),
+          _movimiento(
+            activoId: 1,
+            monto: 80000,
+            categoria: 'alimentacion',
+            fecha: DateTime(2026, 1, 5),
+          ),
         ],
         mes: 3,
         anio: 2026,
       );
 
-      expect(resultado[1], 25000);
-      expect(resultado[2], 20000);
+      expect(resultado['alimentacion'], 25000);
+      expect(resultado['transporte'], 20000);
     });
 
-    test('ignora los préstamos a terceros', () {
-      final resultado = GastosLogic.gastadoPorActivo(
+    test('ignora ingresos y préstamos a terceros', () {
+      final resultado = GastosLogic.gastadoPorCategoria(
         movimientos: [
           _movimiento(activoId: 1, monto: 10000),
           _movimiento(
@@ -431,12 +416,57 @@ void main() {
             monto: 100000,
             categoria: Loan.categoriaPrestamo,
           ),
+          _movimiento(
+            activoId: 1,
+            monto: 90000,
+            tipo: Transaction.tipoIngreso,
+          ),
         ],
         mes: 3,
         anio: 2026,
       );
 
-      expect(resultado[1], 10000);
+      expect(resultado['alimentacion'], 10000);
+      expect(resultado.containsKey(Loan.categoriaPrestamo), isFalse);
+    });
+  });
+
+  group('promedioMensualCategoria', () {
+    test('promedia solo los meses con gasto', () {
+      // Enero y marzo con gasto, febrero sin nada: el promedio es (100 + 300)/2.
+      final promedio = GastosLogic.promedioMensualCategoria(
+        movimientos: [
+          _movimiento(activoId: 1, monto: 100, fecha: DateTime(2026, 1, 10)),
+          _movimiento(activoId: 1, monto: 300, fecha: DateTime(2026, 3, 10)),
+          // Otra categoría: no cuenta.
+          _movimiento(
+            activoId: 1,
+            monto: 999,
+            categoria: 'transporte',
+            fecha: DateTime(2026, 3, 10),
+          ),
+          // Fuera de la ventana de 3 meses.
+          _movimiento(activoId: 1, monto: 5000, fecha: DateTime(2025, 1, 10)),
+        ],
+        categoria: 'alimentacion',
+        mes: 4,
+        anio: 2026,
+      );
+
+      expect(promedio, 200);
+    });
+
+    test('devuelve null sin historial en la ventana', () {
+      final promedio = GastosLogic.promedioMensualCategoria(
+        movimientos: [
+          _movimiento(activoId: 1, monto: 5000, fecha: DateTime(2024, 1, 10)),
+        ],
+        categoria: 'alimentacion',
+        mes: 6,
+        anio: 2026,
+      );
+
+      expect(promedio, isNull);
     });
   });
 

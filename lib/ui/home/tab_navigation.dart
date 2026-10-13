@@ -9,16 +9,17 @@ abstract final class TabIndex {
   static const inicio = 0;
   static const movimientos = 1;
   static const activos = 2;
-  static const gastos = 3;
-  static const deudas = 4;
-  static const metas = 5;
-  static const prestamos = 6;
-  static const estadisticas = 7;
-  static const cotizaciones = 8;
-  static const categorias = 9;
-  static const configuracion = 10;
+  static const presupuesto = 3;
+  static const gastosFijos = 4;
+  static const deudas = 5;
+  static const metas = 6;
+  static const prestamos = 7;
+  static const estadisticas = 8;
+  static const cotizaciones = 9;
+  static const categorias = 10;
+  static const configuracion = 11;
 
-  static const total = 11;
+  static const total = 12;
 }
 
 /// Salta al módulo [index] de la barra.

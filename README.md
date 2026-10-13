@@ -20,7 +20,7 @@ Módulos terminados y operativos:
 | Deudas | Completo |
 | Préstamos e inversiones | Completo |
 | Cotizaciones y proyectos | Completo |
-| Presupuesto y gastos diarios | Completo |
+| Presupuesto y gastos fijos | Completo |
 | Estadísticas | Completo |
 | Perfil, apariencia, categorías personalizadas y backup | Completo |
 | Asistente financiero con IA | No iniciado |
@@ -96,17 +96,19 @@ Permite planear compras o proyectos comparando opciones antes de decidir.
 - Cálculos: subtotal por ítem, total por cotización y **comparación de la cotización más económica** dentro del proyecto.
 - El enlace de compra se copia al portapapeles al tocarlo.
 
-### Gastos presupuestados y gastos diarios
+### Presupuesto y gastos fijos
 
-**Presupuesto mensual**
-- Cada presupuesto parte de un activo (cuenta, billetera o efectivo) y de un monto total que se reparte entre las categorías.
-- Validaciones: el total debe ser mayor que cero, debe haber al menos una partida y la suma de las partidas no puede superar el monto total. Las partidas de categoría *Otro* exigen una nota que explique qué cubren.
-- Muestra el avance por categoría y por presupuesto, el monto sin asignar y avisos cuando se excede el límite.
+Son dos módulos independientes: el presupuesto es un plan de gasto, los gastos fijos son compromisos que se repiten cada mes.
 
-**Gastos diarios (gastos hormiga)**
-- Registro rápido desde una hoja inferior con nombre, valor, categoría y descripción opcional, además de un formulario completo que permite editar la fecha.
-- Validaciones: el nombre es obligatorio y el valor debe ser mayor que cero.
-- Se pueden editar y eliminar.
+**Presupuesto por categoría**
+- Cada presupuesto fija cuánto se está dispuesto a gastar en una categoría durante un mes concreto. No cuelga de una cuenta: el plan dice *en qué* se gasta, no *de qué tarjeta* sale el dinero.
+- El gasto se calcula siempre desde los movimientos reales de esa categoría (pagos de gastos fijos incluidos), así que el plan y la realidad nunca se desincronizan.
+- La pantalla muestra el total planeado frente al gastado, una barra por categoría y avisos cuando se supera el límite. Cada categoría admite un solo presupuesto por mes.
+- Al crear uno nuevo se sugiere un monto a partir del promedio gastado en esa categoría durante los últimos tres meses.
+
+**Gastos fijos**
+- Plantillas de lo que se paga todos los meses (internet, arriendo, servicios): nombre, categoría, monto estimado y fecha de inicio.
+- La app genera sola la lista de pagos que toca cada mes; al confirmar un pago se crea el movimiento real que alimenta el presupuesto de su categoría.
 
 ### Estadísticas y reportes
 
@@ -131,7 +133,7 @@ Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de 
 **Categorías personalizadas**
 - Se pueden crear categorías de gasto o ingreso con nombre e ícono.
 - No se permiten nombres duplicados, ni frente a las categorías predefinidas ni frente a las existentes.
-- Al eliminar una categoría, los movimientos y partidas de presupuesto que la usaban se reasignan a *Categoría eliminada*, de modo que el historial se conserva.
+- Al eliminar una categoría, los movimientos y gastos fijos que la usaban se reasignan a *Categoría eliminada*, de modo que el historial se conserva.
 
 **Backup y restauración**
 - **Generar backup:** copia el archivo `.db` completo y lo comparte mediante el diálogo nativo del sistema, sin pedir permisos de almacenamiento. Se muestra la fecha del último backup.
@@ -143,7 +145,7 @@ Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de 
 - **Flutter 3** / **Dart SDK >= 3.3.0**
 - **Riverpod** para el estado y la inyección de dependencias
 - **go_router** con `StatefulShellRoute` para la navegación
-- **sqflite** como base de datos local (16 tablas, versión de esquema 17)
+- **sqflite** como base de datos local (16 tablas, versión de esquema 18)
 - **fl_chart** para los gráficos
 - **shared_preferences** para preferencias no sensibles
 - **image_picker** + **path_provider** para la foto de perfil
@@ -210,18 +212,20 @@ Plataformas con scaffolding en el repositorio: Android, iOS, Web, Windows, macOS
 
 ## Base de datos
 
-Archivo único `fitki.db` con 16 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `inversiones_movimientos`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `gastos_fijos`, `pagos_gastos_fijos`, `presupuestos_activo`, `categorias_personalizadas` y `perfil`.
+Archivo único `fitki.db` con 16 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `inversiones_movimientos`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `gastos_fijos`, `pagos_gastos_fijos`, `presupuestos_categoria`, `categorias_personalizadas` y `perfil`.
 
-El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 17: los movimientos antiguos guardados como "Otro" con una nota se convierten en categorías personalizadas reales), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
+El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 18: los movimientos antiguos guardados como "Otro" con una nota se convierten en categorías personalizadas reales, y el presupuesto deja de ser un límite por cuenta para pasar a ser un límite por categoría), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
 
 ## Pruebas
 
-Siete archivos en `test/`, todos con pruebas que corren sin emulador ni red; las que tocan persistencia usan SQLite con `sqflite_common_ffi` (en memoria o en un archivo temporal para probar migraciones de esquema):
+Varios archivos en `test/`, todos con pruebas que corren sin emulador ni red; las que tocan persistencia usan SQLite con `sqflite_common_ffi` (en memoria o en un archivo temporal para probar migraciones de esquema):
 
 - `test/widget_test.dart`: prueba de humo que verifica que la app arranca y renderiza la pantalla de inicio, y que volver de segundo plano no monta la pantalla de desbloqueo.
-- `test/navigation_test.dart`: la barra de las cuatro pestañas, el menú lateral y la apertura de cada sección de Configuración.
+- `test/navigation_test.dart`: la barra de los doce módulos, el orden de las ramas del router y la apertura de cada sección de Configuración.
 - `test/acentos_test.dart`: contraste de los siete colores de marca y migración desde el acento rojo antiguo.
-- `test/gastos_logic_test.dart`: cálculos de gastos presupuestados y gastos diarios.
+- `test/gastos_logic_test.dart`: gastos fijos y presupuesto por categoría (comparación de límite contra lo gastado, gasto por categoría y sugerencia por promedio).
+- `test/migracion_otro_test.dart`: migración de esquema sobre una base real en disco; incluye que la v18 deje el presupuesto por categoría en su sitio.
+- `test/activo_repository_test.dart`: borrado de un activo sobre SQLite real, comprobando que el presupuesto por categoría no depende de la cuenta.
 - `test/saldos_metas_test.dart`: la regla de los dos saldos (Saldo Total frente a Saldo Disponible) y la aritmética de los abonos a metas.
 - `test/inversiones_repository_test.dart`: `InversionRepository` sobre una base SQLite en memoria (aportes, saldo reservado y resultado al finalizar).
 - `test/cotizaciones_item_test.dart`: regresión del guardado de items de cotización (la columna `tipo` de `items_cotizacion`).
@@ -240,4 +244,4 @@ La cobertura de pruebas unitarias del resto de `lib/logic/` sigue pendiente.
 - **Reportes exportables:** los gráficos solo se muestran en pantalla, no se exportan a PDF ni se comparten.
 - **Notificaciones y recordatorios:** no hay ninguna. La app no pide el permiso de notificaciones ni publica avisos.
 - **Conversión de divisas:** los activos en distintas monedas se suman directamente, sin conversión.
-- **Cobertura de pruebas:** siete archivos, sin pruebas todavía sobre `movimientos/`, `deudas/`, `metas/` ni `estadisticas/`.
+- **Cobertura de pruebas:** sin pruebas todavía sobre `deudas/`, `metas/` ni `estadisticas/`.

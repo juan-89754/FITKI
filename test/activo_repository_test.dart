@@ -6,7 +6,7 @@ import 'package:fitki/data/models/gasto_fijo.dart';
 import 'package:fitki/data/models/inversion_movimiento.dart';
 import 'package:fitki/data/models/investment.dart';
 import 'package:fitki/data/models/loan.dart';
-import 'package:fitki/data/models/presupuesto_activo.dart';
+import 'package:fitki/data/models/presupuesto_categoria.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/data/repositories/activo_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,8 +69,8 @@ void main() {
                             ? Investment.tableName
                             : (modelo is InversionMovimiento)
                                 ? InversionMovimiento.tableName
-                                : (modelo is PresupuestoActivo)
-                                    ? PresupuestoActivo.tableName
+                                : (modelo is PresupuestoCategoria)
+                                    ? PresupuestoCategoria.tableName
                                     : Transaction.tableName;
     final mapa = switch (modelo) {
       Asset() => modelo.toMap(),
@@ -80,7 +80,7 @@ void main() {
       Loan() => modelo.toMap(),
       Investment() => modelo.toMap(),
       InversionMovimiento() => modelo.toMap(),
-      PresupuestoActivo() => modelo.toMap(),
+      PresupuestoCategoria() => modelo.toMap(),
       Transaction() => modelo.toMap(),
       _ => throw ArgumentError('Modelo no soportado: $modelo'),
     };
@@ -143,8 +143,8 @@ void main() {
       activoId: activoId,
       fechaCreacion: DateTime(2026, 3, 15),
     ));
-    await dbInsert(PresupuestoActivo(
-      activoId: activoId,
+    await dbInsert(PresupuestoCategoria(
+      categoria: 'alimentacion',
       mes: 4,
       anio: 2026,
       montoLimite: 500,
@@ -162,8 +162,12 @@ void main() {
     await repo.delete(activoId);
 
     expect(await filas(Asset.tableName), isEmpty);
-    expect(await filas(PresupuestoActivo.tableName), isEmpty,
-        reason: 'el presupuesto del mes se elimina con su cuenta');
+    // El presupuesto es por categoría, no de la cuenta: borrar un activo no lo
+    // toca.
+    final presupuestos = await filas(PresupuestoCategoria.tableName);
+    expect(presupuestos, hasLength(1),
+        reason: 'el presupuesto por categoría no depende de la cuenta');
+    expect(presupuestos.single['categoria'], 'alimentacion');
 
     final abonos = await filas(AbonoMeta.tableName);
     expect(abonos, hasLength(1), reason: 'el abono conserva su historia');
