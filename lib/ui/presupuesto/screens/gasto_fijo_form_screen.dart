@@ -12,6 +12,7 @@ import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../presupuesto_providers.dart';
 
 /// Alta y edición de un gasto fijo.
@@ -28,7 +29,8 @@ class GastoFijoFormScreen extends ConsumerStatefulWidget {
       _GastoFijoFormScreenState();
 }
 
-class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
+class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _montoController = TextEditingController();
@@ -68,7 +70,9 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
     super.dispose();
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final activos = ref.read(activosStreamProvider).asData?.value ?? const <Asset>[];
@@ -150,7 +154,8 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
         const [];
     final categorias = categoriasDeTipo('gasto', personalizadas);
 
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar gasto fijo' : 'Nuevo gasto fijo'),
@@ -331,7 +336,7 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: _guardar,
+              onPressed: guardando ? null : _guardar,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -340,6 +345,7 @@ class _GastoFijoFormScreenState extends ConsumerState<GastoFijoFormScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

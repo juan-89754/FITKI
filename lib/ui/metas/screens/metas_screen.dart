@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/financial_goal.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../../../logic/metas/metas_logic.dart';
@@ -27,8 +28,13 @@ class MetasScreen extends ConsumerWidget {
       body: metasAsync.when(
         data: (metas) {
           if (metas.isEmpty) {
-            return _EstadoVacio(
-              onAgregar: () => _abrirFormulario(context, ref),
+            return EmptyState(
+              icono: Icons.flag_rounded,
+              titulo: 'No tienes metas aún',
+              descripcion: 'Crea una meta de ahorro y calcula\n'
+                  'cuánto necesitas por semana o mes.',
+              etiquetaAccion: 'Crear meta',
+              onAccion: () => _abrirFormulario(context, ref),
             );
           }
           return ListView.separated(
@@ -210,64 +216,4 @@ class _MetaCard extends StatelessWidget {
   }
 }
 
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
 
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.flag_rounded,
-                size: 40,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes metas aún',
-              style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Crea una meta de ahorro y calcula\ncuánto necesitas por semana o mes.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAgregar,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Crear meta'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

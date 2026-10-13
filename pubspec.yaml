@@ -1,6 +1,6 @@
 name: fitki
 description: Fitki - Aplicación de finanzas personales
-version: 0.1.1+2
+version: 0.1.2+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -21,6 +21,8 @@ dependencies:
   file_picker: ^13.0.0
   uuid: ^4.6.0
   cupertino_icons: ^2.0.0
+  archive: ^4.5.2
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:

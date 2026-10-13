@@ -13,6 +13,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../metas/metas_providers.dart';
 import '../../prestamos_inversiones/prestamos_inversiones_providers.dart';
 import '../presupuesto_providers.dart';
@@ -39,7 +40,8 @@ class PresupuestoActivoFormScreen extends ConsumerStatefulWidget {
 }
 
 class _PresupuestoActivoFormScreenState
-    extends ConsumerState<PresupuestoActivoFormScreen> {
+    extends ConsumerState<PresupuestoActivoFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _montoController = TextEditingController(
     text: widget.presupuesto == null
@@ -66,7 +68,9 @@ class _PresupuestoActivoFormScreenState
         .fold<double>(0, (acc, f) => acc + f.montoEstimado);
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final monto = milesADouble(_montoController.text) ?? 0;
@@ -165,7 +169,8 @@ class _PresupuestoActivoFormScreenState
       );
     }
 
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Presupuesto de ${widget.activo.nombre}'),
@@ -314,7 +319,7 @@ class _PresupuestoActivoFormScreenState
             ),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: _guardar,
+              onPressed: guardando ? null : _guardar,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -323,6 +328,7 @@ class _PresupuestoActivoFormScreenState
             ),
           ],
         ),
+      ),
       ),
     );
   }

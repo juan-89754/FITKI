@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart' hide Transaction;
 import '../db/db_helper.dart';
 import '../models/abono_meta.dart';
 import '../models/financial_goal.dart';
+import '../../shared/errors/app_errores.dart';
 import 'inversion_repository.dart';
 
 /// Una operación sobre una meta que no tiene sentido con los datos actuales.
@@ -12,7 +13,8 @@ import 'inversion_repository.dart';
 /// *por qué* se rechazó, que es justo lo que el usuario necesita ver: no alcanza
 /// el saldo de la cuenta, la meta no tiene ese monto reservado, o la cuenta ya no
 /// existe.
-class OperacionMetaInvalida implements Exception {
+class OperacionMetaInvalida implements Exception, ErrorConMensaje {
+  @override
   final String mensaje;
 
   const OperacionMetaInvalida(this.mensaje);

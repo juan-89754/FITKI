@@ -4,7 +4,9 @@ import '../../data/models/debt.dart';
 import '../../data/models/financial_goal.dart';
 import '../../data/models/transaction.dart';
 import '../../data/providers/shared_providers.dart';
+import '../../logic/activos/activos_logic.dart';
 import '../../logic/estadisticas/estadisticas_logic.dart';
+import '../../logic/movimientos/movimientos_logic.dart';
 import '../deudas/deudas_providers.dart';
 import '../metas/metas_providers.dart';
 import '../movimientos/movimientos_providers.dart';
@@ -34,17 +36,26 @@ final estadisticasDatosProvider = FutureProvider<EstadisticasDatos>((ref) async 
       .where((m) =>
           m.fecha.year == hoy.year && m.fecha.month == hoy.month)
       .toList();
-  final ingresosMes = movimientosMes
-      .where((m) => m.tipo == 'ingreso')
-      .fold<double>(0, (acc, m) => acc + m.monto);
-  final gastosMes = movimientosMes
-      .where((m) => m.tipo == 'gasto')
-      .fold<double>(0, (acc, m) => acc + m.monto);
+
+  // La moneda de cada movimiento es la del activo al que pertenece; los que no
+  // tienen activo resoluble quedan en su propio grupo ("sin moneda").
+  final monedaDe = <int?, String>{
+    for (final activo in activos) activo.id: activo.moneda,
+  };
+  final ingresosMesPorMoneda =
+      MovimientosLogic.totalIngresos(movimientosMes, monedaDe);
+  final gastosMesPorMoneda =
+      MovimientosLogic.totalGastos(movimientosMes, monedaDe);
+
+  final ingresosMes = ingresosMesPorMoneda.values
+      .fold<double>(0, (acc, valor) => acc + valor);
+  final gastosMes =
+      gastosMesPorMoneda.values.fold<double>(0, (acc, valor) => acc + valor);
 
   return EstadisticasDatos(
-    patrimonioTotal:
-        activos.fold<double>(0, (acc, a) => acc + a.montoDisponible),
-    balanceMes: ingresosMes - gastosMes,
+    patrimonioTotal: ActivosLogic.patrimonioTotalPorMoneda(activos),
+    balanceMes:
+        MovimientosLogic.balanceNeto(ingresosMesPorMoneda, gastosMesPorMoneda),
     ingresosMes: ingresosMes,
     gastosMes: gastosMes,
     gastosPorCategoria:

@@ -239,7 +239,7 @@ class _TarjetaPlantilla extends ConsumerWidget {
               if (plantilla.montoVariable)
                 Text(
                   'precio variable',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 10.5),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
             ],
           ),

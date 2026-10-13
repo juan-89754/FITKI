@@ -4,8 +4,9 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/totales_por_moneda.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/asset.dart';
-import '../../../logic/activos/activos_logic.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../activos_providers.dart';
 import '../../home/tab_navigation.dart';
@@ -84,7 +85,6 @@ class ActivosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final patrimonioAsync = ref.watch(patrimonioProvider);
     final patrimonioTotalAsync = ref.watch(patrimonioTotalProvider);
     final disponiblesAsync = ref.watch(patrimonioDisponibleTotalProvider);
     final activosAsync = ref.watch(activosConSaldoProvider);
@@ -99,7 +99,6 @@ class ActivosScreen extends ConsumerWidget {
       body: Column(
         children: [
           _PatrimonioHeader(
-            patrimonioPorMoneda: patrimonioAsync,
             patrimonioTotal: patrimonioTotalAsync,
             disponibleTotal: disponiblesAsync,
             hayReservas: ref.watch(registrosDeMetasProvider).asData?.value
@@ -107,7 +106,14 @@ class ActivosScreen extends ConsumerWidget {
           ),
           Expanded(
             child: activosAsync.isEmpty
-                ? _EstadoVacio(onAgregar: () => _abrirFormulario(context, ref))
+                ? EmptyState(
+                    icono: Icons.account_balance_rounded,
+                    titulo: 'No tienes activos registrados',
+                    descripcion: 'Agrega tu primera cuenta, billetera o '
+                        'efectivo\npara empezar a ver tu patrimonio.',
+                    etiquetaAccion: 'Agregar activo',
+                    onAccion: () => _abrirFormulario(context, ref),
+                  )
                 : ListView.separated(
                     controller: ref.read(
                       tabScrollControllersProvider,
@@ -149,13 +155,11 @@ class ActivosScreen extends ConsumerWidget {
 }
 
 class _PatrimonioHeader extends StatelessWidget {
-  final List<PatrimonioPorMoneda> patrimonioPorMoneda;
-  final double patrimonioTotal;
-  final double disponibleTotal;
+  final Map<String, double> patrimonioTotal;
+  final Map<String, double> disponibleTotal;
   final bool hayReservas;
 
   const _PatrimonioHeader({
-    required this.patrimonioPorMoneda,
     required this.patrimonioTotal,
     required this.disponibleTotal,
     required this.hayReservas,
@@ -183,37 +187,14 @@ class _PatrimonioHeader extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 4),
-          Text(
-            AppFormat.moneda(patrimonioTotal),
+          TotalesPorMoneda(
+            totales: patrimonioTotal,
             style: Theme.of(context).textTheme.headlineMedium!.copyWith(
               fontSize: 28,
               fontWeight: FontWeight.w600,
               color: AppColors.textOnPrimary,
             ),
           ),
-          if (patrimonioPorMoneda.length > 1) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: patrimonioPorMoneda.map((p) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.textOnPrimary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${p.moneda}: ${AppFormat.moneda(p.total, symbol: '')}',
-                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textOnPrimary,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
           // El patrimonio de arriba es la suma de los saldos totales: cuenta
           // también el dinero apartado en metas. Este es el único número que
           // responde "¿cuánto puedo gastar?", y por eso solo aparece cuando hay
@@ -236,13 +217,14 @@ class _PatrimonioHeader extends StatelessWidget {
                     color: AppColors.textOnPrimary.withValues(alpha: 0.9),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    '${AppFormat.moneda(patrimonioTotal - disponibleTotal)} '
-                    'reservados en metas · '
-                    '${AppFormat.moneda(disponibleTotal)} disponibles',
-                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textOnPrimary,
+                  Flexible(
+                    child: Text(
+                      '${_totalesReservadosEnLinea()} reservados en metas · '
+                      '${AppFormat.totalesEnLinea(disponibleTotal)} disponibles',
+                      style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textOnPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -253,60 +235,16 @@ class _PatrimonioHeader extends StatelessWidget {
       ),
     );
   }
-}
 
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
-
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.account_balance_rounded,
-                size: 40,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes activos registrados',
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Agrega tu primera cuenta, billetera o efectivo\npara empezar a ver tu patrimonio.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAgregar,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Agregar activo'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// La parte reservada en metas, desglosada por moneda y sin cerrar en cero:
+  /// solo se listan las monedas donde realmente hay algo reservado.
+  String _totalesReservadosEnLinea() {
+    final reservados = <String, double>{};
+    for (final entrada in patrimonioTotal.entries) {
+      final reservado = entrada.value - (disponibleTotal[entrada.key] ?? 0);
+      if (reservado != 0) reservados[entrada.key] = reservado;
+    }
+    return AppFormat.totalesEnLinea(reservados);
   }
 }
 
@@ -415,7 +353,6 @@ class _ActivoCard extends StatelessWidget {
                   if (value == 'eliminar') onEliminar();
                 },
                 itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'editar', child: Text('Editar')),
                   PopupMenuItem(
                     value: 'eliminar',
                     child: Text(

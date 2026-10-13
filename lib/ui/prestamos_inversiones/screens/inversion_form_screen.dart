@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/investment.dart';
 import '../../../data/providers/shared_providers.dart';
-import '../../../data/repositories/inversion_repository.dart';
 import '../../../logic/inversiones/inversiones_logic.dart';
+import '../../../shared/errors/app_errores.dart';
 import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
-import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 
 class InversionFormScreen extends ConsumerStatefulWidget {
   final Investment? inversion;
@@ -22,7 +22,8 @@ class InversionFormScreen extends ConsumerStatefulWidget {
       _InversionFormScreenState();
 }
 
-class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
+class _InversionFormScreenState extends ConsumerState<InversionFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _montoController = TextEditingController();
   final _tasaController = TextEditingController();
@@ -67,7 +68,8 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar inversión' : 'Nueva inversión'),
@@ -153,7 +155,7 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _guardar,
+                  onPressed: guardando ? null : _guardar,
                   icon: const Icon(Icons.check_rounded),
                   label: Text(
                     _editando ? 'Guardar cambios' : 'Registrar inversión',
@@ -171,6 +173,7 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -326,7 +329,9 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
     if (fecha != null) setState(() => _fecha = fecha);
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final inversionActual = widget.inversion;
@@ -361,23 +366,8 @@ class _InversionFormScreenState extends ConsumerState<InversionFormScreen> {
       } else {
         await repo.insert(inversion);
       }
-    } on OperacionInversionInvalida catch (e) {
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: e.mensaje,
-          type: AppSnackbarType.error,
-        );
-      }
-      return;
-    } catch (_) {
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: 'No se pudo guardar, intenta de nuevo',
-          type: AppSnackbarType.error,
-        );
-      }
+    } catch (e) {
+      if (mounted) AppErrores.mostrar(context, e);
       return;
     }
 

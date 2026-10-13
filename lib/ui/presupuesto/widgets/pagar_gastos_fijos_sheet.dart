@@ -354,7 +354,7 @@ class _FilaPago extends StatelessWidget {
                   'Variable',
                   style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 10.5,
+                    fontSize: 12,
                   ),
                 ),
               ),

@@ -165,15 +165,15 @@ class _ResumenGrid extends StatelessWidget {
         icon: Icons.account_balance_wallet_rounded,
         iconColor: AppColors.primary,
         label: 'Patrimonio total',
-        valor: currency(datos.patrimonioTotal),
+        valor: AppFormat.totalesEnLinea(datos.patrimonioTotal),
       ),
       _DatoResumen(
         icon: Icons.trending_up_rounded,
-        iconColor: datos.balanceMes >= 0
-            ? AppColors.primary
-            : AppColors.coral,
+        iconColor: datos.balanceMes.values.any((valor) => valor < 0)
+            ? AppColors.coral
+            : AppColors.primary,
         label: 'Balance del mes',
-        valor: currency(datos.balanceMes),
+        valor: AppFormat.totalesEnLinea(datos.balanceMes),
       ),
       _DatoResumen(
         icon: Icons.flag_rounded,
@@ -197,7 +197,9 @@ class _ResumenGrid extends StatelessWidget {
         icon: Icons.warning_amber_rounded,
         iconColor: carga.excedeUmbral ? AppColors.coral : AppColors.primary,
         label: 'Carga mensual de deuda',
-        valor: '${carga.porcentaje.toStringAsFixed(0)}%',
+        valor: carga.porcentaje == null
+            ? '—'
+            : '${carga.porcentaje!.toStringAsFixed(0)}%',
         detalle: '${currency(carga.cuotaMensualTotal)} en cuotas',
       ),
     ];
@@ -272,7 +274,7 @@ class _DatoResumen extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                    fontSize: 10,
+                    fontSize: 12,
                   ),
             ),
           ],
@@ -435,7 +437,7 @@ return Padding(
                       _abreviarMonto(value),
                       textAlign: TextAlign.right,
                       style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                            fontSize: 10,
+                            fontSize: 12,
                           ),
                     ),
                   );

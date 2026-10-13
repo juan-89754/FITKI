@@ -229,7 +229,7 @@ class _TarjetaPresupuesto extends ConsumerWidget {
                     'Te pasaste ${AppFormat.moneda(resumen.excedido)}',
                     style: const TextStyle(
                       color: Color(0xFF8C2F1C),
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -281,7 +281,7 @@ class _TarjetaPresupuesto extends ConsumerWidget {
               ),
             ],
           ),
-          if (resumen.porCategoria.isNotEmpty) ...[
+          if (resumen.porCategoria.isNotEmpty || resumen.prestado > 0) ...[
             const SizedBox(height: 14),
             Divider(height: 1, color: AppColors.borderSubtle),
             const SizedBox(height: 12),
@@ -294,6 +294,38 @@ class _TarjetaPresupuesto extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
+            // El préstamo a terceros salió de la cuenta pero no es consumo: se
+            // muestra aparte, sin contar contra el límite del presupuesto.
+            if (resumen.prestado > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.handshake_rounded,
+                      size: 15,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Prestado a terceros',                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      AppFormat.moneda(resumen.prestado),
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             for (final renglon in resumen.porCategoria.take(5))
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -328,7 +360,7 @@ class _TarjetaPresupuesto extends ConsumerWidget {
             if (resumen.porCategoria.length > 5)
               Text(
                 '+ ${resumen.porCategoria.length - 5} categorías más',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
           ] else
             Padding(
@@ -400,7 +432,7 @@ class _Cifra extends StatelessWidget {
       children: [
         Text(
           etiqueta,
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         const SizedBox(height: 2),
         Text(

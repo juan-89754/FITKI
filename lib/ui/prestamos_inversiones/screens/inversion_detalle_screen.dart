@@ -13,6 +13,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/detalle_fila.dart';
 import '../prestamos_inversiones_providers.dart';
 import 'inversion_form_screen.dart';
 
@@ -299,21 +300,21 @@ class _Resumen extends StatelessWidget {
     final resultado = actual.gananciaObtenida ?? 0;
     final positivo = resultado >= 0;
 
-    final filas = <_FilaDesglose>[
+    final filas = <DetalleFila>[
       if (tieneTasa)
-        _FilaDesglose(
+        DetalleFila(
           label: 'Ganancia proyectada '
               '(${InversionesLogic.labelPeriodoCorto(actual.periodoTasa)})',
           value: currency(proyectada),
         ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Resultado registrado',
         value: currency(resultado),
         destacado: true,
         destacadoColor: positivo ? AppColors.primary : AppColors.coral,
       ),
       if (rendimiento != null)
-        _FilaDesglose(
+        DetalleFila(
           label: 'Rendimiento real',
           value: '${rendimiento!.rendimientoPorcentaje.toStringAsFixed(2)}%',
         ),
@@ -724,46 +725,6 @@ class _FilaMovimiento extends StatelessWidget {
             .titleSmall!
             .copyWith(color: color, fontWeight: FontWeight.w600),
       ),
-    );
-  }
-}
-
-class _FilaDesglose extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool destacado;
-  final Color? destacadoColor;
-
-  const _FilaDesglose({
-    required this.label,
-    required this.value,
-    this.destacado = false,
-    this.destacadoColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-          ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                color: destacado
-                    ? (destacadoColor ?? AppColors.textPrimary)
-                    : AppColors.textPrimary,
-                fontWeight:
-                    destacado ? FontWeight.w700 : FontWeight.w500,
-              ),
-        ),
-      ],
     );
   }
 }

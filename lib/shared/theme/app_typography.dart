@@ -63,7 +63,7 @@ class AppTypography {
         color: AppColors.textSecondary,
       ),
       labelSmall: interRegular.copyWith(
-        fontSize: 11,
+        fontSize: 12,
         height: 1.4,
         color: AppColors.textSecondary,
       ),

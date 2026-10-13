@@ -9,6 +9,7 @@ import '../../../data/providers/shared_providers.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../widgets/perfil_avatar.dart';
 
 /// Edición del perfil del usuario: foto de perfil (cámara o galería) y
@@ -22,7 +23,8 @@ class PerfilScreen extends ConsumerStatefulWidget {
   ConsumerState<PerfilScreen> createState() => _PerfilScreenState();
 }
 
-class _PerfilScreenState extends ConsumerState<PerfilScreen> {
+class _PerfilScreenState extends ConsumerState<PerfilScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
@@ -153,7 +155,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     return destino;
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final nombre = _nombreController.text.trim();
@@ -190,7 +194,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Editar perfil'),
@@ -248,7 +253,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: _guardar,
+                        onPressed: guardando ? null : _guardar,
                         icon: const Icon(Icons.check_rounded),
                         label: Text(
                           _perfil == null ? 'Crear perfil' : 'Guardar cambios',
@@ -267,6 +272,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/debt.dart';
 import '../../../data/providers/shared_providers.dart';
 
@@ -18,7 +19,8 @@ class DeudaFormScreen extends ConsumerStatefulWidget {
   ConsumerState<DeudaFormScreen> createState() => _DeudaFormScreenState();
 }
 
-class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen> {
+class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _pendienteController = TextEditingController();
@@ -72,7 +74,8 @@ class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar deuda' : 'Nueva deuda'),
@@ -216,7 +219,7 @@ class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _guardar,
+                  onPressed: guardando ? null : _guardar,
                   icon: const Icon(Icons.check_rounded),
                   label: Text(_editando ? 'Guardar cambios' : 'Crear deuda'),
                   style: FilledButton.styleFrom(
@@ -232,6 +235,7 @@ class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -319,7 +323,9 @@ class _DeudaFormScreenState extends ConsumerState<DeudaFormScreen> {
     if (fecha != null) setState(() => _fechaProximoPago = fecha);
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final deudaActual = widget.deuda;

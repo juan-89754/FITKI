@@ -1,32 +1,39 @@
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
 import '../../data/db/db_helper.dart';
+import '../../data/storage/comprobante_storage.dart';
 
-/// Backups de Fitki: la app usa una sola base de datos sqflite, así que la
-/// forma más simple y confiable de respaldar/restaurar es copiar el archivo
-/// .db completo (no exportar tabla por tabla).
+/// Backups de Fitki: la app usa una sola base de datos sqflite, pero los
+/// comprobantes adjuntos viven como archivos sueltos en disco. Para que un
+/// movimiento restaurado no quede apuntando a un adjunto inexistente, el
+/// respaldo es un `.zip` con la base (`fitki.db`) y la carpeta de comprobantes
+/// adentro. Los backups antiguos (un `.db` suelto, sin adjuntos) también se
+/// siguen restaurando.
 ///
 /// Esta capa es lógica pura: no depende de Riverpod. La invalidación de los
 /// providers de datos (para que la UI se recargue) la dispara la pantalla
 /// mediante el callback [onRestaurado].
 ///
 /// GARANTÍA DE INTEGRIDAD AL RESTAURAR:
-///  - Se valida ANTES de tocar la base real que el archivo elegido tenga el
-///    esquema de Fitki (consulta a sqlite_master en modo solo lectura, conexión
-///    aparte). Un archivo que no lo cumpla se rechaza sin modificar nada. La
-///    validación previa exige el núcleo de tablas (las que tiene cualquier
-///    backup de Fitki, por antiguo que sea); las que agregar una versión nueva
-///    se exigen sobre la base ya migrada, y la migración se encarga de crearlas.
-///  - Durante el reemplazo se conserva una copia de la base actual en un
-///    archivo temporal. Ante cualquier fallo a mitad de camino (copias,
-///    reapertura o verificación posterior) se REVIERTE la base real desde esa
-///    copia (o se elimina el archivo reemplazado si no existía base previa) y
-///    se deja la app operativa con los datos originales.
+///  - Se valida ANTES de tocar la base real que el `.db` elegido (suelto o
+///    extraído del `.zip`) tenga el esquema de Fitki (consulta a sqlite_master
+///    en modo solo lectura, conexión aparte). Un archivo que no lo cumpla se
+///    rechaza sin modificar nada. La validación previa exige el núcleo de
+///    tablas (las que tiene cualquier backup de Fitki, por antiguo que sea);
+///    las que agrega una versión nueva se exigen sobre la base ya migrada, y la
+///    migración se encarga de crearlas.
+///  - Durante el reemplazo se conserva una copia de la base actual (y de la
+///    carpeta de comprobantes, cuando el backup trae adjuntos) en ubicaciones
+///    temporales. Ante cualquier fallo a mitad de camino (copias, reapertura o
+///    verificación posterior) se REVIERTE la base real y los comprobantes desde
+///    esas copias (o se elimina lo reemplazado si no había nada previo) y se
+///    deja la app operativa con los datos originales.
 class RestauracionRevertidaException implements Exception {
   const RestauracionRevertidaException();
 
@@ -37,6 +44,12 @@ class RestauracionRevertidaException implements Exception {
   @override
   String toString() => mensajeUsuario;
 }
+
+/// Nombre del archivo de base dentro del `.zip` de backup (en la raíz).
+const String _nombreDbEnZip = 'fitki.db';
+
+/// Carpeta de comprobantes dentro del `.zip` de backup.
+const String _carpetaComprobantes = 'comprobantes';
 
 /// Tablas que ya existían antes de que la app empezara a agregar tablas nuevas.
 /// Un archivo solo se acepta como backup de Fitki si trae TODAS estas: son las
@@ -74,9 +87,9 @@ const Set<String> _tablasAgregadas = {
 /// Todas las tablas que [DbHelper] crea al inicializar.
 const Set<String> _tablasFitki = {..._tablasNucleo, ..._tablasAgregadas};
 
-/// Copia el archivo .db actual (la misma ruta que usa [DbHelper]) a un
-/// archivo temporal del dispositivo con nombre
-/// `fitki_backup_YYYY-MM-DD_HHmm.db` y devuelve la ruta del archivo copiado.
+/// Empaqueta el estado actual de Fitki en un `.zip` (`fitki.db` + la carpeta
+/// `comprobantes/`) en un archivo temporal del dispositivo con nombre
+/// `fitki_backup_YYYY-MM-DD_HHmm.zip` y devuelve la ruta del archivo generado.
 Future<String> generarBackup() async {
   final rutaDb = await DbHelper.getDatabasePath();
   final archivoDb = File(rutaDb);
@@ -84,25 +97,42 @@ Future<String> generarBackup() async {
     throw FileSystemException('No se encontró la base de datos actual', rutaDb);
   }
 
+  final archivo = Archive();
+  archivo.add(ArchiveFile.bytes(_nombreDbEnZip, await archivoDb.readAsBytes()));
+
+  // Los comprobantes son archivos sueltos: si no viajan en el backup, un
+  // movimiento restaurado apuntaría a un adjunto inexistente.
+  final dirComprobantes = await ComprobanteStorage().directorio();
+  if (await dirComprobantes.exists()) {
+    await for (final entidad in dirComprobantes.list()) {
+      if (entidad is! File) continue;
+      archivo.add(ArchiveFile.bytes(
+        '$_carpetaComprobantes/${p.basename(entidad.path)}',
+        await entidad.readAsBytes(),
+      ));
+    }
+  }
+
   final dirTemp = await getTemporaryDirectory();
   final nombre = 'fitki_backup_'
       '${DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now())}'
-      '.db';
+      '.zip';
   final destino = p.join(dirTemp.path, nombre);
 
-  await archivoDb.copy(destino);
+  await File(destino).writeAsBytes(ZipEncoder().encodeBytes(archivo), flush: true);
   return destino;
 }
 
-/// Restaura los datos de Fitki desde el archivo elegido, con la máxima
-/// salvaguarda posible: el archivo real solo se reemplaza si el elegido pasa
-/// la validación de esquema, y si algo falla durante la restauración se
-/// revierte la base desde un respaldo temporal tomado al inicio.
+/// Restaura los datos de Fitki desde el archivo elegido (un `.zip` de Fitki o
+/// un `.db` antiguo), con la máxima salvaguarda posible: la base real solo se
+/// reemplaza si el `.db` pasa la validación de esquema, y si algo falla durante
+/// la restauración se revierten la base y los comprobantes desde copias
+/// temporales tomadas al inicio.
 ///
 /// Lanza [FileSystemException] si el archivo elegido no existe,
-/// [FormatException] si no es un backup válido de Fitki (tablas incompletas)
-/// y [RestauracionRevertidaException] si la restauración falla a mitad de
-/// camino y la base original fue restaurada.
+/// [FormatException] si no es un backup válido de Fitki (zip ilegible o tablas
+/// incompletas) y [RestauracionRevertidaException] si la restauración falla a
+/// mitad de camino y el estado original fue restaurado.
 Future<void> restaurarBackup(
   String rutaArchivoElegido, {
   void Function()? onRestaurado,
@@ -112,61 +142,98 @@ Future<void> restaurarBackup(
     throw FileSystemException('El archivo elegido no existe', rutaArchivoElegido);
   }
 
-  // 1) Validación de esquema ANTES de tocar la base real. Se abre el archivo
-  //    elegido en SOLO LECTURA (conexión aparte) y se comprueba contra
-  //    sqlite_master que estén todas las tablas esperadas de Fitki.
-  if (!await _esBackupFitkiValido(rutaArchivoElegido)) {
-    throw const FormatException('Este archivo no es un backup válido de Fitki');
+  // Prepara el origen: un .db suelto (backup antiguo) o el .db y los
+  // comprobantes extraídos de un .zip a un directorio temporal.
+  final preparado = await _prepararOrigen(rutaArchivoElegido);
+  try {
+    // 1) Validación de esquema ANTES de tocar la base real. Se abre el .db
+    //    elegido en SOLO LECTURA (conexión aparte) y se comprueba contra
+    //    sqlite_master que estén todas las tablas del núcleo de Fitki.
+    if (!await _esBackupFitkiValido(preparado.rutaDb)) {
+      throw const FormatException('Este archivo no es un backup válido de Fitki');
+    }
+    await _reemplazarEstado(preparado, onRestaurado: onRestaurado);
+  } finally {
+    await _limpiarStaging(preparado.staging);
   }
+}
 
+/// Reemplaza la base real (y, si el backup los trae, los comprobantes) por lo
+/// indicado en [preparado], revirtiendo ante cualquier fallo.
+Future<void> _reemplazarEstado(
+  _BackupPreparado preparado, {
+  void Function()? onRestaurado,
+}) async {
   final db = DbHelper();
   final archivoDb = File(await DbHelper.getDatabasePath());
-  // Indica si ya había base previa: si no, no hay respaldo que tomar y el
-  // revert del paso d vuelve al "estado inicial" (sin archivo .db).
   final existiaBase = archivoDb.existsSync();
   final dirTemp = await getTemporaryDirectory();
-  // a) El respaldo temporal de la base ACTUAL es el ancla de la reversión:
-  //    si algo falla después del reemplazo, se recupera desde aquí.
   final respaldo = File(p.join(dirTemp.path, 'fitki_antes_de_restaurar.db'));
+
+  final comprobantesActuales = await ComprobanteStorage().directorio();
+  final reemplazaComprobantes = preparado.comprobantes != null;
+  final existianComprobantes = reemplazaComprobantes &&
+      (await comprobantesActuales.exists()) &&
+      (await comprobantesActuales.list().toList()).isNotEmpty;
+  final respaldoComprobantes =
+      Directory(p.join(dirTemp.path, 'fitki_comprobantes_antes'));
 
   // Se cierra la conexión actual y se olvida la referencia para poder
   // reemplazar el archivo y reabrirlo. La base real solo se muta a partir de
-  // aquí; cualquier fallo posterior detona la reversión (paso d).
+  // aquí; cualquier fallo posterior detona la reversión.
   await db.close();
 
   try {
-    // a) Copia de seguridad de los datos actuales (solo si existían).
+    // a) Copia de seguridad de lo actual (solo lo que existe).
     if (existiaBase) {
       await archivoDb.copy(respaldo.path);
     }
+    if (existianComprobantes) {
+      await _copiarDirectorio(comprobantesActuales, respaldoComprobantes);
+    }
 
     // b) Reemplazo del archivo real por el elegido.
-    await origen.copy(archivoDb.path);
+    await File(preparado.rutaDb).copy(archivoDb.path);
     _borrarArchivosHermanos(archivoDb.path);
 
-    // c) Reapertura y verificación funcional de la base ya reemplazada (las
+    // c) Reemplazo de los comprobantes, si el backup los trae.
+    if (reemplazaComprobantes) {
+      await _reemplazarDirectorio(preparado.comprobantes!, comprobantesActuales);
+    }
+
+    // d) Reapertura y verificación funcional de la base ya reemplazada (las
     //    migraciones de esquema se aplican al abrirla).
     final conexion = await db.database;
     if (await _esquemaCompletoYLegible(conexion)) {
-      // e) Éxito: se elimina el respaldo temporal.
+      // e) Éxito: se eliminan las copias temporales.
       _eliminarSiExiste(respaldo);
+      _eliminarDirectorio(respaldoComprobantes);
       onRestaurado?.call();
       return;
     }
-    // Si la base reemplazada no quedó completa/legible, se cae a la
-    // reversión común de abajo (paso d).
+    // Si la base reemplazada no quedó completa/legible, se cae a la reversión.
   } catch (_) {
-    // 3) Cualquier fallo de las copias, la reapertura o la verificación
-    //    (permisos, espacio, base ilegible…) conduce a la reversión.
+    // Cualquier fallo de las copias, la reapertura o la verificación (permisos,
+    // espacio, base ilegible…) conduce a la reversión.
   }
 
-  // d) Reversión automática: la base real vuelve a su estado original.
-  await _revertir(db, archivoDb, respaldo, existiaBase: existiaBase);
+  // f) Reversión automática: base y comprobantes vuelven a su estado original.
+  await _revertir(
+    db,
+    archivoDb,
+    respaldo,
+    existiaBase: existiaBase,
+    comprobantesActuales: comprobantesActuales,
+    respaldoComprobantes: respaldoComprobantes,
+    existianComprobantes: existianComprobantes,
+    reemplazaComprobantes: reemplazaComprobantes,
+  );
   throw const RestauracionRevertidaException();
 }
 
-/// Revierte la base real a su estado previo a la restauración. Si existía
-/// base, se vuelve a copiar [respaldo] sobre la ruta real, se descartan
+/// Revierte la base real (y los comprobantes, si el backup los había
+/// reemplazado) a su estado previo a la restauración. Si existía base, se
+/// vuelve a copiar [respaldo] sobre la ruta real, se descartan
 /// journals/checkpoints huérfanos del archivo reemplazado y se reabre la
 /// conexión para que la app quede operativa con los datos originales. Si no
 /// existía base ([existiaBase] false), se elimina el archivo reemplazado para
@@ -180,12 +247,30 @@ Future<void> _revertir(
   File archivoDb,
   File respaldo, {
   required bool existiaBase,
+  required Directory comprobantesActuales,
+  required Directory respaldoComprobantes,
+  required bool existianComprobantes,
+  required bool reemplazaComprobantes,
 }) async {
   try {
     // Libera la conexión sobre el archivo reemplazado/roto antes de tocarlo.
     await db.close();
   } catch (_) {
     // La conexión puede estar ya cerrada o en uso; se continúa igual.
+  }
+
+  // Comprobantes: vuelven a su estado previo si el backup los reemplazó.
+  if (reemplazaComprobantes) {
+    try {
+      if (existianComprobantes && await respaldoComprobantes.exists()) {
+        await _reemplazarDirectorio(respaldoComprobantes, comprobantesActuales);
+      } else if (!existianComprobantes && await comprobantesActuales.exists()) {
+        await comprobantesActuales.delete(recursive: true);
+      }
+    } catch (_) {
+      // Best-effort: si no se pudo revertir, los adjuntos del backup quedan;
+      // la base sí se revierte abajo.
+    }
   }
 
   if (!existiaBase) {
@@ -210,6 +295,85 @@ Future<void> _revertir(
     // La reapertura tras revertir es best-effort: el archivo ya quedó
     // reemplazado por el original y la conexión se reintentará.
   }
+}
+
+/// Prepara el material a restaurar. Para un `.db` suelto (backup antiguo)
+/// devuelve esa misma ruta y ningún comprobante. Para un `.zip` extrae el
+/// `fitki.db` y la carpeta `comprobantes/` a un directorio temporal y devuelve
+/// sus rutas. Lanza [FormatException] si el `.zip` no se puede leer o no trae
+/// una base.
+Future<_BackupPreparado> _prepararOrigen(String rutaElegida) async {
+  if (p.extension(rutaElegida).toLowerCase() != '.zip') {
+    return _BackupPreparado(rutaDb: rutaElegida);
+  }
+
+  final staging = Directory(
+    p.join((await getTemporaryDirectory()).path, 'fitki_restore'),
+  );
+  if (await staging.exists()) {
+    await staging.delete(recursive: true);
+  }
+  await staging.create(recursive: true);
+
+  Archive archivo;
+  try {
+    archivo = ZipDecoder().decodeBytes(await File(rutaElegida).readAsBytes());
+  } catch (_) {
+    await _limpiarStaging(staging);
+    throw const FormatException('Este archivo no es un backup válido de Fitki');
+  }
+
+  File? dbExtraida;
+  Directory? dirComprobantes;
+  for (final entrada in archivo) {
+    if (!entrada.isFile) continue;
+    final nombre = entrada.name.replaceAll('\\', '/');
+    final base = p.basename(nombre);
+    final datos = entrada.readBytes();
+    if (datos == null) continue;
+
+    if (dbExtraida == null && base.toLowerCase().endsWith('.db')) {
+      dbExtraida = File(p.join(staging.path, 'elegida.db'));
+      await dbExtraida.writeAsBytes(datos, flush: true);
+    } else if (nombre.startsWith('$_carpetaComprobantes/')) {
+      dirComprobantes ??= Directory(p.join(staging.path, _carpetaComprobantes))
+        ..createSync(recursive: true);
+      await File(p.join(dirComprobantes.path, base))
+          .writeAsBytes(datos, flush: true);
+    }
+  }
+
+  if (dbExtraida == null) {
+    await _limpiarStaging(staging);
+    throw const FormatException('Este archivo no es un backup válido de Fitki');
+  }
+
+  return _BackupPreparado(
+    rutaDb: dbExtraida.path,
+    comprobantes: dirComprobantes,
+    staging: staging,
+  );
+}
+
+/// Copia los archivos de [origen] sobre [destino] (creándolo si hace falta) sin
+/// borrar lo que ya hubiera allí.
+Future<void> _copiarDirectorio(Directory origen, Directory destino) async {
+  if (!await destino.exists()) {
+    await destino.create(recursive: true);
+  }
+  await for (final entidad in origen.list()) {
+    if (entidad is File) {
+      await entidad.copy(p.join(destino.path, p.basename(entidad.path)));
+    }
+  }
+}
+
+/// Deja [destino] con exactamente los archivos de [origen]: lo vacía primero.
+Future<void> _reemplazarDirectorio(Directory origen, Directory destino) async {
+  if (await destino.exists()) {
+    await destino.delete(recursive: true);
+  }
+  await _copiarDirectorio(origen, destino);
 }
 
 /// Abre el archivo en modo solo lectura y verifica que contenga TODAS las
@@ -295,4 +459,33 @@ void _eliminarSiExiste(File archivo) {
   } catch (_) {
     // Limpieza best-effort de un temporal.
   }
+}
+
+void _eliminarDirectorio(Directory dir) {
+  try {
+    if (dir.existsSync()) dir.deleteSync(recursive: true);
+  } catch (_) {
+    // Limpieza best-effort de un temporal.
+  }
+}
+
+Future<void> _limpiarStaging(Directory? staging) async {
+  if (staging == null) return;
+  _eliminarDirectorio(staging);
+}
+
+/// Material ya preparado a partir del archivo elegido: la ruta del `.db` a
+/// validar/restaurar, el directorio temporal con los comprobantes (null si el
+/// backup no trae adjuntos, p. ej. un `.db` antiguo) y el directorio temporal a
+/// limpiar al terminar (null cuando el origen es el propio `.db` elegido).
+class _BackupPreparado {
+  final String rutaDb;
+  final Directory? comprobantes;
+  final Directory? staging;
+
+  const _BackupPreparado({
+    required this.rutaDb,
+    this.comprobantes,
+    this.staging,
+  });
 }

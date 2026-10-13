@@ -12,6 +12,7 @@ import '../../shared/format/app_format.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
 import '../../shared/widgets/category_tile.dart';
+import '../../shared/widgets/totales_por_moneda.dart';
 import '../../data/models/financial_goal.dart';
 import '../../data/models/investment.dart';
 import '../../data/models/transaction.dart';
@@ -108,8 +109,6 @@ class HomeShell extends ConsumerWidget {
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
-
-  static String _moneda(double valor) => AppFormat.moneda(valor);
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -209,7 +208,7 @@ class _Header extends StatelessWidget {
   });
 
   /// Todo el dinero de las cuentas menos lo reservado; lo que se puede gastar.
-  final double disponible;
+  final Map<String, double> disponible;
 
   final String saludo;
   final Perfil? perfil;
@@ -318,8 +317,8 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                HomeScreen._moneda(disponible),
+              TotalesPorMoneda(
+                totales: disponible,
                 style: Theme.of(context).textTheme.headlineLarge!.copyWith(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
@@ -345,7 +344,7 @@ class _Categorias extends StatefulWidget {
   final double metasTotal;
   final double deudasPendiente;
   final double inversionesTotal;
-  final double patrimonioTotal;
+  final Map<String, double> patrimonioTotal;
 
   @override
   State<_Categorias> createState() => _CategoriasState();
@@ -385,25 +384,25 @@ class _CategoriasState extends State<_Categorias> {
                   (
                     label: 'Metas',
                     icon: Icons.flag_rounded,
-                    amount: widget.metasTotal,
+                    monto: AppFormat.moneda(widget.metasTotal),
                     onTap: () => irAModulo(context, TabIndex.metas),
                   ),
                   (
                     label: 'Deudas',
                     icon: Icons.account_balance_wallet_rounded,
-                    amount: widget.deudasPendiente,
+                    monto: AppFormat.moneda(widget.deudasPendiente),
                     onTap: () => irAModulo(context, TabIndex.deudas),
                   ),
                   (
                     label: 'Inversiones',
                     icon: Icons.trending_up_rounded,
-                    amount: widget.inversionesTotal,
+                    monto: AppFormat.moneda(widget.inversionesTotal),
                     onTap: () => irAModulo(context, TabIndex.prestamos),
                   ),
                   (
                     label: 'Patrimonio total',
                     icon: Icons.account_balance_rounded,
-                    amount: widget.patrimonioTotal,
+                    monto: AppFormat.totalesEnLinea(widget.patrimonioTotal),
                     onTap: () => irAModulo(context, TabIndex.activos),
                   ),
                 ];
@@ -413,8 +412,7 @@ class _CategoriasState extends State<_Categorias> {
                   child: CategoryTile(
                     label: cat.label,
                     icon: cat.icon,
-                    amount: cat.amount,
-                    currency: r'$',
+                    monto: cat.monto,
                     onTap: cat.onTap,
                   ),
                 );
@@ -669,7 +667,7 @@ class _FilaUltimoMovimiento extends StatelessWidget {
                 ),
               ),
               Text(
-                '$signo${HomeScreen._moneda(movimiento.monto)}',
+                '$signo${AppFormat.moneda(movimiento.monto)}',
                 style: Theme.of(context).textTheme.titleMedium!.copyWith(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,

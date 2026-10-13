@@ -8,6 +8,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/categoria_personalizada.dart';
@@ -25,7 +26,8 @@ class MovimientoFormScreen extends ConsumerStatefulWidget {
       _MovimientoFormScreenState();
 }
 
-class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
+class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
+    with GuardandoMixin {
   File? _comprobante;
   String? _comprobantePathActual;
   String? _comprobanteNombreActual;
@@ -104,7 +106,9 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
     }
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     // Todo movimiento va atado a una cuenta, sin importar su tipo: es lo que
@@ -198,7 +202,8 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
     // se reconstruye con la lista actualizada.
     ref.watch(categoriasPersonalizadasStreamProvider);
 
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar movimiento' : 'Nuevo movimiento'),
@@ -343,7 +348,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
             ),
             const SizedBox(height: 32),
             FilledButton(
-              onPressed: _guardar,
+              onPressed: guardando ? null : _guardar,
               style: FilledButton.styleFrom(
                 backgroundColor: _tipo == 'ingreso'
                     ? AppColors.primary
@@ -379,6 +384,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen> {
             ],
           ],
         ),
+      ),
       ),
     );
   }

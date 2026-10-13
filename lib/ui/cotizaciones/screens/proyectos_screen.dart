@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/quote_project.dart';
 import '../cotizaciones_providers.dart';
 import 'proyecto_detalle_screen.dart';
@@ -24,8 +25,13 @@ class ProyectosScreen extends ConsumerWidget {
       body: proyectosAsync.when(
         data: (proyectos) {
           if (proyectos.isEmpty) {
-            return _EstadoVacio(
-              onAgregar: () => _abrirFormulario(context, ref),
+            return EmptyState(
+              icono: Icons.ballot_rounded,
+              titulo: 'No tienes proyectos aún',
+              descripcion: 'Crea un proyecto, agrega varias cotizaciones\n'
+                  'y encuentra la opción más económica.',
+              etiquetaAccion: 'Crear proyecto',
+              onAccion: () => _abrirFormulario(context, ref),
             );
           }
           return ListView.separated(
@@ -186,64 +192,4 @@ class _ProyectoCard extends StatelessWidget {
   }
 }
 
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
 
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.mintPale,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.ballot_rounded,
-                size: 40,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes proyectos aún',
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Crea un proyecto, agrega varias cotizaciones\ny encuentra la opción más económica.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAgregar,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Crear proyecto'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnPrimary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

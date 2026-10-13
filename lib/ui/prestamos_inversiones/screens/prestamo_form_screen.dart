@@ -6,6 +6,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/forms/activo_obligatorio.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -19,7 +20,8 @@ class PrestamoFormScreen extends ConsumerStatefulWidget {
   ConsumerState<PrestamoFormScreen> createState() => _PrestamoFormScreenState();
 }
 
-class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
+class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _beneficiarioController = TextEditingController();
   final _montoController = TextEditingController();
@@ -69,7 +71,8 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
     final fechaInvalida = _fechaPagoEsperada.isBefore(_fechaPrestamo);
     final activosAsync = ref.watch(activosStreamProvider);
 
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar préstamo' : 'Nuevo préstamo'),
@@ -183,7 +186,7 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _guardar,
+                  onPressed: guardando ? null : _guardar,
                   icon: const Icon(Icons.check_rounded),
                   label: Text(
                     _editando ? 'Guardar cambios' : 'Registrar préstamo',
@@ -201,6 +204,7 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -332,7 +336,9 @@ class _PrestamoFormScreenState extends ConsumerState<PrestamoFormScreen> {
     }
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fechaPagoEsperada.isBefore(_fechaPrestamo)) {
       AppSnackbar.show(

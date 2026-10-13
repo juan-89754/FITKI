@@ -1,4 +1,5 @@
 import '../../data/models/gasto_fijo.dart';
+import '../../data/models/loan.dart';
 import '../../data/models/pago_gasto_fijo.dart';
 import '../../data/models/presupuesto_activo.dart';
 import '../../data/models/transaction.dart';
@@ -8,11 +9,18 @@ import '../../data/models/transaction.dart';
 class ResumenPresupuesto {
   final PresupuestoActivo presupuesto;
   final double gastado;
+
+  /// Lo que salió del activo en préstamos a terceros este mes. Se informa
+  /// aparte y NO engrosa [gastado]: prestar no es consumir, es dinero que se
+  /// espera recuperar, así que no debe consumir el límite del presupuesto.
+  final double prestado;
+
   final List<GastoPorCategoria> porCategoria;
 
   const ResumenPresupuesto({
     required this.presupuesto,
     required this.gastado,
+    this.prestado = 0,
     required this.porCategoria,
   });
 
@@ -228,15 +236,23 @@ class GastosLogic {
           !m.fecha.isAfter(fin),
     );
 
-    final gastado = gastosDelActivo.fold<double>(
-      0,
-      (acc, m) => acc + m.monto,
-    );
+    double gastado = 0;
+    double prestado = 0;
+    final gastosDeConsumo = <Transaction>[];
+    for (final movimiento in gastosDelActivo) {
+      if (movimiento.categoria == Loan.categoriaPrestamo) {
+        prestado += movimiento.monto;
+        continue;
+      }
+      gastado += movimiento.monto;
+      gastosDeConsumo.add(movimiento);
+    }
 
     return ResumenPresupuesto(
       presupuesto: presupuesto,
       gastado: gastado,
-      porCategoria: desglosePorCategoria(gastosDelActivo.toList()),
+      prestado: prestado,
+      porCategoria: desglosePorCategoria(gastosDeConsumo),
     );
   }
 
@@ -249,6 +265,7 @@ class GastosLogic {
     final porCategoria = <String, double>{};
     for (final movimiento in movimientos) {
       if (movimiento.tipo != tipoGasto) continue;
+      if (movimiento.categoria == Loan.categoriaPrestamo) continue;
       porCategoria[movimiento.categoria] =
           (porCategoria[movimiento.categoria] ?? 0) + movimiento.monto;
     }
@@ -277,6 +294,7 @@ class GastosLogic {
     final resultado = <int, double>{};
     for (final movimiento in movimientos) {
       if (movimiento.tipo != tipoGasto) continue;
+      if (movimiento.categoria == Loan.categoriaPrestamo) continue;
       if (movimiento.fecha.isBefore(inicio) || movimiento.fecha.isAfter(fin)) {
         continue;
       }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../format/app_format.dart';
+
 import '../theme/app_colors.dart';
 
 /// Tarjeta del carrusel de inicio (Metas, Deudas, Inversiones y Patrimonio).
@@ -15,20 +15,18 @@ class CategoryTile extends StatelessWidget {
     super.key,
     required this.label,
     required this.icon,
-    required this.amount,
-    required this.currency,
+    required this.monto,
     this.onTap,
   });
 
   final String label;
   final IconData icon;
-  final double amount;
-  final String currency;
-  final VoidCallback? onTap;
 
-  String get formattedAmount {
-    return AppFormat.moneda(amount, symbol: currency);
-  }
+  /// Monto ya formateado (incluye el símbolo de su moneda). El patrimonio se
+  /// pasa como línea "[totalesEnLinea]" cuando hay más de una moneda.
+  final String monto;
+
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -74,12 +72,16 @@ class CategoryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              formattedAmount,
-              style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                // Al 75% para que el monto acompañe sin competir con el
-                // nombre. Sigue siendo blanco, así que no depende del acento.
-                color: AppColors.textOnPrimary.withValues(alpha: 0.75),
+            Flexible(
+              child: Text(
+                monto,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                  // Al 75% para que el monto acompañe sin competir con el
+                  // nombre. Sigue siendo blanco, así que no depende del acento.
+                  color: AppColors.textOnPrimary.withValues(alpha: 0.75),
+                ),
               ),
             ),
           ],

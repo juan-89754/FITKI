@@ -5,13 +5,18 @@
 class CargaDeuda {
   final double cuotaMensualTotal;
   final double ingresosMensuales;
-  final double porcentaje;
+
+  /// Cuánto pesan las cuotas sobre los ingresos del mes, en porcentaje. Es
+  /// `null` cuando no hay ingresos registrados: sin una base contra la que
+  /// comparar, el 0% mentiría (una cuota cualquiera sobre ingresos 0 no es
+  /// "0% de carga", es "no se puede calcular"). La UI muestra "—" en ese caso.
+  final double? porcentaje;
 
   /// Fracción (0-1) de los ingresos a partir de la cual la carga se considera
   /// riesgosa (p. ej. 0.40 = 40%).
   final double umbral;
 
-  bool get excedeUmbral => porcentaje > umbral * 100;
+  bool get excedeUmbral => porcentaje != null && porcentaje! > umbral * 100;
 
   const CargaDeuda({
     required this.cuotaMensualTotal,
@@ -23,7 +28,7 @@ class CargaDeuda {
 
 /// Calcula la carga de deuda a partir de la cuota mensual total y los
 /// ingresos del mes, comparándola contra el [umbral] configurado
-/// (fracción 0-1, p. ej. 0.40).
+/// (fracción 0-1, p. ej. 0.40). Con ingresos en cero no hay porcentaje.
 CargaDeuda calcularCargaDeuda(
   double cuotaMensualTotal,
   double ingresosMensuales, {
@@ -31,7 +36,7 @@ CargaDeuda calcularCargaDeuda(
 }) {
   final porcentaje = ingresosMensuales > 0
       ? (cuotaMensualTotal / ingresosMensuales) * 100
-      : 0.0;
+      : null;
   return CargaDeuda(
     cuotaMensualTotal: cuotaMensualTotal,
     ingresosMensuales: ingresosMensuales,

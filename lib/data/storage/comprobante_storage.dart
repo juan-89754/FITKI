@@ -22,6 +22,25 @@ class ComprobanteStorage {
     return comprobantesDir;
   }
 
+  /// Directorio donde viven los comprobantes adjuntos (se crea si no existe).
+  /// Lo usan el backup (para incluir los adjuntos en el .zip) y el borrado
+  /// total de datos (para limpiarlos).
+  Future<Directory> directorio() => _getComprobantesDir();
+
+  /// Elimina todos los archivos del directorio de comprobantes conservando el
+  /// directorio. Best-effort: un archivo que no se pueda borrar no interrumpe
+  /// el resto.
+  Future<void> vaciar() async {
+    final dir = await _getComprobantesDir();
+    await for (final entidad in dir.list()) {
+      try {
+        await entidad.delete(recursive: true);
+      } catch (_) {
+        // Limpieza best-effort.
+      }
+    }
+  }
+
   /// Guarda el archivo [archivo] en el directorio de comprobantes de la app
   /// y devuelve la ruta relativa/absoluta almacenada (ruta absoluta para
   /// facilitar apertura/lectura).

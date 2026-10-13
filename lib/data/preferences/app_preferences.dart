@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Preferencias simples de la app (tema, color de marca, umbral de carga de
-/// deuda y notificaciones): todo lo que no necesita tabla propia en SQLite.
+/// Preferencias simples de la app (tema, color de marca y umbral de carga de
+/// deuda): todo lo que no necesita tabla propia en SQLite.
 ///
 /// Los accesos son métodos asíncronos tipados (no getters/setters síncronos)
 /// porque la lectura/escritura depende de almacenamiento en disco.
@@ -19,8 +19,6 @@ class AppPreferences {
   static const String _temaRojoKey = 'config_tema_rojo';
   static const String _nombreAcentoRojo = 'Rojo';
   static const String _umbralCargaDeudaKey = 'config_umbral_carga_deuda';
-  static const String _notificacionesHabilitadasKey =
-      'config_notificaciones_habilitadas';
   static const String _fechaUltimoBackupKey = 'config_fecha_ultimo_backup';
 
   /// Fracción de los ingresos mensuales a partir de la cual la carga de
@@ -76,17 +74,6 @@ class AppPreferences {
   static Future<void> setUmbralCargaDeuda(double value) async {
     final prefs = await _prefs();
     await prefs.setDouble(_umbralCargaDeudaKey, value);
-  }
-
-  /// Si la app emite recordatorios/notificaciones.
-  static Future<bool> areNotificacionesHabilitadas() async {
-    final prefs = await _prefs();
-    return prefs.getBool(_notificacionesHabilitadasKey) ?? false;
-  }
-
-  static Future<void> setNotificacionesHabilitadas(bool value) async {
-    final prefs = await _prefs();
-    await prefs.setBool(_notificacionesHabilitadasKey, value);
   }
 
   /// Fecha del último backup generado, o null si nunca se ha generado uno.

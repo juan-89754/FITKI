@@ -1,4 +1,5 @@
 import 'package:fitki/data/models/gasto_fijo.dart';
+import 'package:fitki/data/models/loan.dart';
 import 'package:fitki/data/models/pago_gasto_fijo.dart';
 import 'package:fitki/data/models/presupuesto_activo.dart';
 import 'package:fitki/data/models/transaction.dart';
@@ -352,6 +353,28 @@ void main() {
       expect(resumen.gastado, 500000);
       expect(resumen.excedido, 400000);
     });
+
+    test('un préstamo a terceros no consume el límite y se informa aparte', () {
+      final resumen = GastosLogic.compararPresupuesto(
+        presupuesto: _presupuesto(limite: 100000),
+        movimientos: [
+          _movimiento(activoId: 1, monto: 30000),
+          _movimiento(
+            activoId: 1,
+            monto: 200000,
+            categoria: Loan.categoriaPrestamo,
+          ),
+        ],
+      );
+
+      expect(resumen.gastado, 30000);
+      expect(resumen.prestado, 200000);
+      expect(resumen.superado, isFalse);
+      expect(
+        resumen.porCategoria.map((r) => r.categoria),
+        isNot(contains(Loan.categoriaPrestamo)),
+      );
+    });
   });
 
   group('desglosePorCategoria', () {
@@ -397,6 +420,23 @@ void main() {
 
       expect(resultado[1], 25000);
       expect(resultado[2], 20000);
+    });
+
+    test('ignora los préstamos a terceros', () {
+      final resultado = GastosLogic.gastadoPorActivo(
+        movimientos: [
+          _movimiento(activoId: 1, monto: 10000),
+          _movimiento(
+            activoId: 1,
+            monto: 100000,
+            categoria: Loan.categoriaPrestamo,
+          ),
+        ],
+        mes: 3,
+        anio: 2026,
+      );
+
+      expect(resultado[1], 10000);
     });
   });
 

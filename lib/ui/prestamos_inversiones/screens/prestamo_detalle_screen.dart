@@ -6,6 +6,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/detalle_fila.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/loan.dart';
 import '../../../logic/prestamos/prestamos_logic.dart';
@@ -436,29 +437,29 @@ class _DatosPrestamo extends StatelessWidget {
     const currency = AppFormat.moneda;
     final restante = PrestamosLogic.montoRestante(prestamo);
 
-    final filas = <_FilaDesglose>[
-      _FilaDesglose(
+    final filas = <DetalleFila>[
+      DetalleFila(
         label: 'Cuenta de origen',
         value: nombreActivo ?? 'Cuenta eliminada',
         valorGris: nombreActivo == null,
       ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Fecha del préstamo',
         value: DateFormat('dd MMM yyyy').format(prestamo.fechaPrestamo),
       ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Fecha esperada de pago',
         value: DateFormat('dd MMM yyyy').format(prestamo.fechaPagoEsperada),
       ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Recuperado',
         value: currency(prestamo.montoPagado),
       ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Por cobrar',
         value: currency(restante),
       ),
-      _FilaDesglose(
+      DetalleFila(
         label: 'Estado',
         value: PrestamosLogic.labelEstado(estado),
         destacado: true,
@@ -494,50 +495,6 @@ class _DatosPrestamo extends StatelessWidget {
                         child: fila,
                       ))
                   .toList(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilaDesglose extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool destacado;
-  final bool valorGris;
-
-  const _FilaDesglose({
-    required this.label,
-    required this.value,
-    this.destacado = false,
-    this.valorGris = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall!
-              .copyWith(color: AppColors.textSecondary),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.titleSmall!.copyWith(
-              fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-color: destacado
-                      ? AppColors.primary
-                      : (valorGris
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary),
             ),
           ),
         ),

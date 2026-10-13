@@ -6,13 +6,15 @@ import '../models/inversion_movimiento.dart';
 import '../models/transaction.dart';
 import '../db/db_helper.dart';
 import '../../logic/categorias/categoria_labels.dart';
+import '../../shared/errors/app_errores.dart';
 import 'activo_repository.dart';
 import 'meta_repository.dart';
 
 /// Una operación sobre una inversión que no tiene sentido con los datos
 /// actuales (no hay saldo disponible, no hay capital reservado, ya está
 /// finalizada, etc.). Se lanza para que la pantalla pueda explicar por qué.
-class OperacionInversionInvalida implements Exception {
+class OperacionInversionInvalida implements Exception, ErrorConMensaje {
+  @override
   final String mensaje;
 
   const OperacionInversionInvalida(this.mensaje);

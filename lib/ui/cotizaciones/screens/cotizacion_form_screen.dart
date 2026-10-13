@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/quote.dart';
 import '../cotizaciones_providers.dart';
 
@@ -20,7 +21,8 @@ class CotizacionFormScreen extends ConsumerStatefulWidget {
       _CotizacionFormScreenState();
 }
 
-class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen> {
+class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen>
+    with GuardandoMixin {
   final _formKey = GlobalKey<FormState>();
   final _tituloController = TextEditingController();
   final _notasController = TextEditingController();
@@ -46,7 +48,8 @@ class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return protegerSalida(
+      Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editando ? 'Editar cotización' : 'Nueva cotización'),
@@ -89,7 +92,7 @@ class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _guardar,
+                  onPressed: guardando ? null : _guardar,
                   icon: const Icon(Icons.check_rounded),
                   label: Text(
                     _editando ? 'Guardar cambios' : 'Crear cotización',
@@ -108,10 +111,13 @@ class _CotizacionFormScreenState extends ConsumerState<CotizacionFormScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
-  Future<void> _guardar() async {
+  Future<void> _guardar() => ejecutarGuardado(_guardarReal);
+
+  Future<void> _guardarReal() async {
     if (!_formKey.currentState!.validate()) return;
 
     final actual = widget.cotizacion;

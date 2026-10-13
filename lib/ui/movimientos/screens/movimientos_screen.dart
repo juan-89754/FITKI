@@ -5,6 +5,7 @@ import '../../../shared/format/app_format.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../logic/categorias/categoria_labels.dart';
@@ -54,11 +55,22 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
                 final activos = activosAsync.asData?.value ?? const <Asset>[];
                 return Column(
                   children: [
-                    _ResumenBalance(movimientos: movimientos),
+                    _ResumenBalance(
+                      movimientos: movimientos,
+                      monedaDe: {
+                        for (final activo in activos)
+                          activo.id: activo.moneda,
+                      },
+                    ),
                     Expanded(
                       child: filtrados.isEmpty
-                          ? _EstadoVacio(
-                              onAgregar: () => _abrirFormulario(context),
+                          ? EmptyState(
+                              icono: Icons.swap_horiz_rounded,
+                              titulo: 'No hay movimientos',
+                              descripcion: 'Registra tu primer ingreso o '
+                                  'gasto\npara comenzar.',
+                              etiquetaAccion: 'Agregar movimiento',
+                              onAccion: () => _abrirFormulario(context),
                             )
                           : ListView.separated(
                               controller: ref
@@ -185,7 +197,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
             context,
             message: movimiento.categoria == categoriaAhorroMeta
                 ? 'Los abonos a metas se cambian desde la propia meta'
-                : 'Los movimientos de un pr�stamo se cambian desde el pr�stamo',
+                : 'Los movimientos de un préstamo se cambian desde el préstamo',
             type: AppSnackbarType.info,
           );
           return;
@@ -208,7 +220,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
         message:
             movimiento != null && movimiento.categoria == categoriaAhorroMeta
                 ? 'Los abonos a metas se cambian desde la propia meta'
-                : 'Los movimientos de un prǸstamo se cambian desde el prǸstamo',
+                : 'Los movimientos de un préstamo se cambian desde el préstamo',
         type: AppSnackbarType.info,
       );
       return;
@@ -243,7 +255,7 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
       context: context,
       title: 'Eliminar movimiento',
       message:
-          '¿Eliminar ${movimiento.categoria} por ${AppFormat.moneda(movimiento.monto)}?'
+          '¿Eliminar ${labelCategoria(movimiento.categoria)} por ${AppFormat.moneda(movimiento.monto)}?'
           '\nSe revertirá el saldo del activo asociado.',
       confirmLabel: 'Eliminar',
       destructive: true,
@@ -271,15 +283,16 @@ class _MovimientosScreenState extends ConsumerState<MovimientosScreen> {
 
 class _ResumenBalance extends StatelessWidget {
   final List<Transaction> movimientos;
+  final Map<int?, String> monedaDe;
 
-  const _ResumenBalance({required this.movimientos});
+  const _ResumenBalance({required this.movimientos, required this.monedaDe});
 
   @override
   Widget build(BuildContext context) {
-    final ingresos = MovimientosLogic.totalIngresos(movimientos);
-    final gastos = MovimientosLogic.totalGastos(movimientos);
-    final balance = MovimientosLogic.balanceNeto(movimientos);
-    const currency = AppFormat.moneda;
+    final ingresos = MovimientosLogic.totalIngresos(movimientos, monedaDe);
+    final gastos = MovimientosLogic.totalGastos(movimientos, monedaDe);
+    final balance = MovimientosLogic.balanceNeto(ingresos, gastos);
+    final balanceEnRojo = balance.values.any((valor) => valor < 0);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -293,20 +306,20 @@ class _ResumenBalance extends StatelessWidget {
         children: [
           _ColumnaResumen(
             label: 'Ingresos',
-            value: currency(ingresos),
+            value: AppFormat.totalesEnLinea(ingresos),
             color: AppColors.primary,
           ),
           _separador(),
           _ColumnaResumen(
             label: 'Gastos',
-            value: currency(gastos),
+            value: AppFormat.totalesEnLinea(gastos),
             color: AppColors.coral,
           ),
           _separador(),
           _ColumnaResumen(
             label: 'Balance',
-            value: currency(balance),
-            color: balance >= 0 ? AppColors.primary : AppColors.coral,
+            value: AppFormat.totalesEnLinea(balance),
+            color: balanceEnRojo ? AppColors.coral : AppColors.primary,
           ),
         ],
       ),
@@ -353,58 +366,6 @@ class _ColumnaResumen extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EstadoVacio extends StatelessWidget {
-  final VoidCallback onAgregar;
-
-  const _EstadoVacio({required this.onAgregar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.mintPale,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.swap_horiz_rounded,
-              size: 40,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No hay movimientos',
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Registra tu primer ingreso o gasto\npara comenzar.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleSmall!.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onAgregar,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Agregar movimiento'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
           ),
         ],

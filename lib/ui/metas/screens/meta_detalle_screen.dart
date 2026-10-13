@@ -6,6 +6,7 @@ import '../../../shared/format/miles_input_formatter.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/detalle_fila.dart';
 import '../../../data/models/abono_meta.dart';
 import '../../../data/models/financial_goal.dart';
 import '../../../data/providers/shared_providers.dart';
@@ -812,47 +813,47 @@ class _DesgloseCalculo extends StatelessWidget {
       );
     }
 
-    final filas = <_FilaDesglose>[];
-    filas.add(_FilaDesglose(
+    final filas = <DetalleFila>[];
+    filas.add(DetalleFila(
       label: 'Monto objetivo',
       value: currency(meta.montoObjetivo!),
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Ahorrado a la fecha',
       value: currency(calculo.saldo),
     ));
-    filas.add(_FilaDesglose(
+    filas.add(DetalleFila(
       label: 'Falta por ahorrar',
       value: currency(calculo.montoFaltante!),
       destacado: true,
     ));
 
     if (meta.fechaEstimada == null) {
-      filas.add(const _FilaDesglose(
+      filas.add(const DetalleFila(
         label: 'Fecha estimada',
         value: 'Sin fecha definida',
         valorGris: true,
       ));
     } else {
       final fecha = DateFormat('dd MMM yyyy').format(meta.fechaEstimada!);
-      filas.add(_FilaDesglose(label: 'Fecha estimada', value: fecha));
+      filas.add(DetalleFila(label: 'Fecha estimada', value: fecha));
       if ((calculo.semanasRestantes ?? 0) > 0) {
-        filas.add(_FilaDesglose(
+        filas.add(DetalleFila(
           label: 'Semanas restantes',
           value: '${calculo.semanasRestantes}',
         ));
-        filas.add(_FilaDesglose(
+        filas.add(DetalleFila(
           label: 'Ahorro sugerido por semana',
           value: currency(calculo.ahorroSemanal!),
           destacado: true,
         ));
       }
       if ((calculo.mesesRestantes ?? 0) > 0) {
-        filas.add(_FilaDesglose(
+        filas.add(DetalleFila(
           label: 'Meses restantes',
           value: '${calculo.mesesRestantes}',
         ));
-        filas.add(_FilaDesglose(
+        filas.add(DetalleFila(
           label: 'Ahorro sugerido por mes',
           value: currency(calculo.ahorroMensual!),
           destacado: true,
@@ -860,7 +861,7 @@ class _DesgloseCalculo extends StatelessWidget {
       }
       if ((calculo.semanasRestantes ?? 0) == 0 &&
           (calculo.mesesRestantes ?? 0) == 0) {
-        filas.add(const _FilaDesglose(
+        filas.add(const DetalleFila(
           label: 'Tiempo restante',
           value: 'Fecha vencida',
           valorGris: true,
@@ -869,7 +870,7 @@ class _DesgloseCalculo extends StatelessWidget {
     }
 
     if (calculo.cumpleObjetivo) {
-      filas.add(const _FilaDesglose(
+      filas.add(const DetalleFila(
         label: 'Estado',
         value: 'Meta cumplida 🎉',
         destacado: true,
@@ -905,44 +906,6 @@ class _DesgloseCalculo extends StatelessWidget {
                       ))
                   .toList(),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilaDesglose extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool destacado;
-  final bool valorGris;
-
-  const _FilaDesglose({
-    required this.label,
-    required this.value,
-    this.destacado = false,
-    this.valorGris = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.titleSmall!.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleSmall!.copyWith(
-            fontWeight: destacado ? FontWeight.w700 : FontWeight.w500,
-            color: destacado
-                ? AppColors.primary
-                : (valorGris ? AppColors.textSecondary : AppColors.textPrimary),
           ),
         ),
       ],
