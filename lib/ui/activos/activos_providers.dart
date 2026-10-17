@@ -43,8 +43,7 @@ final patrimonioDisponibleTotalProvider = Provider<Map<String, double>>((ref) {
 ///
 /// - **Saldo Total**: todo el dinero de la cuenta. Lo mueven ingresos y gastos.
 /// - **Saldo Disponible**: el total menos lo reservado en metas. Es el único
-///   saldo contra el que tiene sentido comparar un presupuesto o un límite de
-///   gasto.
+///   saldo contra el que tiene sentido comparar un límite de gasto.
 class ActivoConSaldo {
   final Asset activo;
   final double saldoTotal;

@@ -5,8 +5,10 @@ import '../../data/models/financial_goal.dart';
 import '../../data/models/transaction.dart';
 import '../../data/providers/shared_providers.dart';
 import '../../logic/activos/activos_logic.dart';
+import '../../logic/asignaciones/asignacion_logic.dart';
 import '../../logic/estadisticas/estadisticas_logic.dart';
 import '../../logic/movimientos/movimientos_logic.dart';
+import '../asignaciones/asignacion_providers.dart';
 import '../deudas/deudas_providers.dart';
 import '../metas/metas_providers.dart';
 import '../movimientos/movimientos_providers.dart';
@@ -52,6 +54,13 @@ final estadisticasDatosProvider = FutureProvider<EstadisticasDatos>((ref) async 
   final gastosMes =
       gastosMesPorMoneda.values.fold<double>(0, (acc, valor) => acc + valor);
 
+  // AFCA: el avance y el reparto salen de los planes vigentes (no archivados),
+  // reusando el resumen que ya arma el módulo de asignación.
+  final resumenesPlanes = ref.watch(resumenesPlanProvider);
+  final planesAfca = resumenesPlanes
+      .where((resumen) => !resumen.plan.archivado)
+      .toList();
+
   return EstadisticasDatos(
     patrimonioTotal: ActivosLogic.patrimonioTotalPorMoneda(activos),
     balanceMes:
@@ -71,5 +80,11 @@ final estadisticasDatosProvider = FutureProvider<EstadisticasDatos>((ref) async 
     totalCuotasMensuales: deudas
         .where((deuda) => deuda.montoPendiente > 0)
         .fold<double>(0, (acc, deuda) => acc + (deuda.valorCuota ?? 0)),
+    planesAfca: planesAfca,
+    repartoAfca: AsignacionLogic.repartoPorCategoria(resumenesPlanes),
+    gastoSinPresupuestarMes: AsignacionLogic.gastadoNoPresupuestadoDelMes(
+      movimientos,
+      referencia: hoy,
+    ),
   );
 });

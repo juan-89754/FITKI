@@ -13,9 +13,8 @@ import '../models/debt.dart';
 import '../models/quote_project.dart';
 import '../models/quote.dart';
 import '../models/quote_item.dart';
-import '../models/gasto_fijo.dart';
-import '../models/pago_gasto_fijo.dart';
-import '../models/presupuesto_categoria.dart';
+import '../models/plan_asignacion.dart';
+import '../models/detalle_asignacion.dart';
 import '../models/categoria_personalizada.dart';
 import '../models/perfil.dart';
 
@@ -27,7 +26,7 @@ class DbHelper {
 
   DbHelper._internal();
 
-  static const int _dbVersion = 18;
+  static const int _dbVersion = 20;
   static const String _dbName = 'fitki.db';
 
   Future<sqflite.Database> get database async {
@@ -74,9 +73,8 @@ class DbHelper {
     batch.execute(QuoteProject.createTableSQL);
     batch.execute(Quote.createTableSQL);
     batch.execute(QuoteItem.createTableSQL);
-    batch.execute(GastoFijo.createTableSQL);
-    batch.execute(PagoGastoFijo.createTableSQL);
-    batch.execute(PresupuestoCategoria.createTableSQL);
+    batch.execute(PlanAsignacion.createTableSQL);
+    batch.execute(DetalleAsignacion.createTableSQL);
     batch.execute(CategoriaPersonalizada.createTableSQL);
     batch.execute(Perfil.createTableSQL);
 
@@ -140,8 +138,10 @@ class DbHelper {
       ]) {
         await db.execute('DROP TABLE IF EXISTS $tabla');
       }
-      await db.execute(GastoFijo.createTableSQL);
-      await db.execute(PagoGastoFijo.createTableSQL);
+      // La v9 creaba aquí `gastos_fijos` y `pagos_gastos_fijos`, más tarde
+      // limpiadas por la v16 y ya inexistentes tras la v19. No se crean: un
+      // modelo que solo vive entre dos migraciones no tiene sentido, y la v19
+      // las volvería a borrar de todas formas.
       // Aquí la v9 creaba el presupuesto por activo. Ese modelo ya no existe:
       // la v18 descarta esa tabla y en su lugar crea el presupuesto por
       // categoría. No se recrea porque una base que llegue hasta la versión
@@ -286,7 +286,6 @@ class DbHelper {
         InversionMovimiento.tableName,
         Investment.tableName,
         Loan.tableName,
-        GastoFijo.tableName,
       ]) {
         await db.execute('''
           UPDATE $tabla SET activo_id = NULL
@@ -307,16 +306,57 @@ class DbHelper {
       await _migrarOtroACategorias(db);
     }
     if (oldVersion < 18) {
-      // El presupuesto deja de ser un límite por cuenta y pasa a ser un límite
-      // por categoría: el plan ahora dice en qué se gasta, no de qué tarjeta se
-      // saca. Un límite por cuenta no se puede convertir en límites por
-      // categoría (son conceptos distintos), así que la tabla vieja se
-      // descarta. Los movimientos, que son el historial real del dinero, no se
-      // tocan. El nombre va como texto literal a propósito: el modelo
-      // PresupuestoActivo ya no existe en el código, pero una base vieja sí
-      // tiene esa tabla.
+      // El presupuesto deja de ser un límite por cuenta: la tabla vieja se
+      // descarta porque un límite por cuenta no se puede convertir en límites
+      // por categoría (son conceptos distintos). La tabla que esta migración
+      // creaba (`presupuestos_categoria`) se borró a su vez en la v20 con el
+      // módulo completo, así que una base que suba desde acá termina sin
+      // ninguna tabla de presupuesto. Los movimientos, que son el historial
+      // real del dinero, nunca se tocan. El nombre va como texto literal a
+      // propósito: el modelo PresupuestoActivo ya no existe en el código, pero
+      // una base vieja sí tiene esa tabla.
       await db.execute('DROP TABLE IF EXISTS presupuestos_activo');
-      await db.execute(PresupuestoCategoria.createTableSQL);
+    }
+    if (oldVersion < 19) {
+      // Módulo AFCA: los planes de asignación sustituyen al presupuesto rígido
+      // por mes. Un plan se ata a un activo y reparte un monto entre categorías
+      // (bolsillos) sin fechas. Los detalles no guardan lo gastado: se deriva de
+      // los movimientos vinculados por `plan_detalle_id`.
+      //
+      // La columna se añade aquí y no solo en el esquema inicial porque una base
+      // que venga de la v18 no la tiene. Se comprueba con PRAGMA antes de
+      // agregarla para no abortar con "duplicate column name" en una base que
+      // nació directo en la versión actual.
+      //
+      // El módulo de Gastos Fijos desaparece: la v19 borra sus tablas. Los pagos
+      // ya confirmados quedaron como movimientos en `movimientos`, que es el
+      // historial real y no se toca. Los nombres van como texto literal: sus
+      // modelos ya no existen en el código, pero una base vieja sí tiene esas
+      // tablas.
+      for (final tabla in ['gastos_fijos', 'pagos_gastos_fijos']) {
+        await db.execute('DROP TABLE IF EXISTS $tabla');
+      }
+      await db.execute(PlanAsignacion.createTableSQL);
+      await db.execute(DetalleAsignacion.createTableSQL);
+      final columnasMov = await db.rawQuery(
+        'PRAGMA table_info(${Transaction.tableName})',
+      );
+      final yaTieneDetalle = columnasMov.any(
+        (columna) => columna['name'] == 'plan_detalle_id',
+      );
+      if (!yaTieneDetalle) {
+        await db.execute(
+          'ALTER TABLE ${Transaction.tableName} ADD COLUMN plan_detalle_id INTEGER',
+        );
+      }
+    }
+    if (oldVersion < 20) {
+      // Fin del presupuesto mensual: AFCA (v19) ya cubre la asignación del
+      // dinero y no conviven los dos controles en la misma app. Se borra la
+      // tabla de topes por categoría sin migrar sus cifras: los topes son
+      // datos de configuración, no historial, y los planes de AFCA se arman a
+      // mano. Los movimientos y los planes creados desde la v19 no se tocan.
+      await db.execute('DROP TABLE IF EXISTS presupuestos_categoria');
     }
   }
 
@@ -410,9 +450,8 @@ class DbHelper {
       QuoteProject.tableName,
       Quote.tableName,
       QuoteItem.tableName,
-      GastoFijo.tableName,
-      PagoGastoFijo.tableName,
-      PresupuestoCategoria.tableName,
+      PlanAsignacion.tableName,
+      DetalleAsignacion.tableName,
       CategoriaPersonalizada.tableName,
       Perfil.tableName,
     ]) {

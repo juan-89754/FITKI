@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/format/app_format.dart';
@@ -7,8 +8,9 @@ import '../../../shared/theme/app_colors.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../logic/categorias/categoria_labels.dart';
+import '../../asignaciones/asignacion_providers.dart';
 
-class MovimientoDetalleScreen extends StatelessWidget {
+class MovimientoDetalleScreen extends ConsumerWidget {
   final Transaction movimiento;
   final Asset? asset;
 
@@ -23,11 +25,17 @@ class MovimientoDetalleScreen extends StatelessWidget {
   Color get _color => _esIngreso ? AppColors.primary : AppColors.coral;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fechaFormateada = DateFormat('dd/MM/yyyy').format(movimiento.fecha);
     final moneda = asset?.moneda ?? 'COP';
     final symbol = moneda == 'USD' ? r'US$' : r'$';
     final nota = movimiento.nota?.trim();
+    // Destino AFCA: el bolsillo al que se imputó el gasto. Un ingreso nunca
+    // entra en un plan, y un gasto sin vínculo es "sin asignar".
+    final planDetalleId = _esIngreso ? null : movimiento.planDetalleId;
+    final nombrePlan = planDetalleId == null
+        ? null
+        : ref.watch(nombrePlanDeBolsilloProvider(planDetalleId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -123,6 +131,24 @@ class MovimientoDetalleScreen extends StatelessWidget {
                   label: 'Fecha',
                   value: fechaFormateada,
                 ),
+                if (!_esIngreso) ...[
+                  const SizedBox(height: 12),
+                  _DetalleItem(
+                    icon: Icons.donut_small_rounded,
+                    label: 'Destino',
+                    // El plan al que se imputa es la mitad de la idea de AFCA:
+                    // sin este dato el gasto queda "sin asignar" y el plan
+                    // no baja su restante.
+                    value: planDetalleId == null
+                        ? 'Sin asignar (fuera de plan)'
+                        : nombrePlan == null
+                            ? 'Plan'
+                            : '$nombrePlan · ${labelCategoria(movimiento.categoria)}',
+                    valueColor: planDetalleId == null
+                        ? AppColors.textSecondary
+                        : AppColors.primary,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _DetalleItem(
                   icon: Icons.note_alt_outlined,

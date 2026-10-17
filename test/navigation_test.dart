@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:fitki/main.dart';
 import 'package:fitki/data/models/asset.dart';
 import 'package:fitki/data/models/debt.dart';
+import 'package:fitki/data/models/detalle_asignacion.dart';
 import 'package:fitki/data/models/financial_goal.dart';
 import 'package:fitki/data/models/abono_meta.dart';
 import 'package:fitki/data/models/investment.dart';
+import 'package:fitki/data/models/plan_asignacion.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/data/providers/shared_providers.dart';
 import 'package:fitki/data/models/perfil.dart';
@@ -16,6 +18,7 @@ import 'package:fitki/data/repositories/perfil_repository.dart';
 import 'package:fitki/shared/widgets/app_bottom_nav.dart';
 import 'package:fitki/shared/widgets/page_shell_container.dart';
 import 'package:fitki/logic/carga_deuda.dart';
+import 'package:fitki/ui/asignaciones/asignacion_providers.dart';
 import 'package:fitki/ui/deudas/deudas_providers.dart';
 import 'package:fitki/ui/home/home_screen.dart';
 import 'package:fitki/ui/metas/metas_providers.dart';
@@ -24,21 +27,21 @@ import 'package:fitki/ui/prestamos_inversiones/prestamos_inversiones_providers.d
 
 /// Regresiones del sistema de navegación.
 ///
-/// La app pasó de 4 pestañas + menú lateral a 12 módulos, todos en la barra
+/// La app pasó de 4 pestañas + menú lateral a 11 módulos, todos en la barra
 /// inferior y todos alcanzables deslizando. Lo que se vigila acá es lo que se
 /// rompió en cada paso de ese cambio: que las etiquetas entren completas, que la
 /// barra se desplace de verdad, que tocar un módulo change de rama y no apile
 /// una pantalla encima de otra, y que el botón atrás siga llevando a Inicio
 /// en vez de cerrar la app.
 ///
-/// Los tests de UI no pueden recorrer los 12 módulos: cada uno monta su pantalla
+/// Los tests de UI no pueden recorrer los 11 módulos: cada uno monta su pantalla
 /// y varias piden datos a la base, que no existe en `flutter test`. La lista
 /// completa se verifica sobre el árbol de widgets (el `Row` de la barra construye
 /// todos sus hijos, visibles o no) y el cambio de rama se comprueba con los
 /// destinos que ya sabíamos montar.
 Finder get barra => find.byType(AppBottomNav);
 
-/// Los 12 módulos: etiqueta de la barra y ruta de la rama, en el orden de
+/// Los 11 módulos: etiqueta de la barra y ruta de la rama, en el orden de
 /// `TabIndex`. Esta lista es la expectativa de dos cosas a la vez —el orden de
 /// la barra y el orden de las ramas del router—, así que si alguien agrega un
 /// módulo de un lado y no del otro, el test lo dice.
@@ -46,8 +49,7 @@ const _ramas = <(String, String)>[
   ('Inicio', '/'),
   ('Movimientos', '/movimientos'),
   ('Activos', '/activos'),
-  ('Presupuesto', '/presupuesto'),
-  ('Gastos fijos', '/gastos-fijos'),
+  ('Asignación', '/asignacion'),
   ('Deudas', '/deudas'),
   ('Metas', '/metas'),
   ('Préstamos', '/prestamos-inversiones'),
@@ -59,13 +61,11 @@ const _ramas = <(String, String)>[
 
 /// Los destinos que se pueden montar en un test de widgets.
 ///
-/// "Presupuesto" y "Gastos fijos" quedan afuera a propósito: sus pantallas leen
-/// `gastosFijosStreamProvider`, `pagosGastosFijosStreamProvider`,
-/// `presupuestosCategoriasStreamProvider`, `resumenesPresupuestoProvider` y
-/// otros providers sobre sqflite. Sin base de datos real quedan promesas sin
-/// resolver y el test termina con timers pendientes. Sus rutas las cubre el test
-/// de ramas de abajo, que no necesita montar nada.
-const _montables = {'Inicio', 'Movimientos', 'Activos', 'Deudas', 'Configuración'};
+/// El resto queda afuera porque sus pantallas leen providers sobre sqflite. Sin
+/// base de datos real quedan promesas sin resolver y el test termina con timers
+/// pendientes. Sus rutas las cubre el test de ramas de abajo, que no necesita
+/// montar nada.
+const _montables = {'Inicio', 'Movimientos', 'Activos', 'Asignación', 'Deudas', 'Configuración'};
 
 Finder _scrollDeLaBarra() => find.descendant(
   of: barra,
@@ -143,6 +143,15 @@ void main() {
           cargaDeudaProvider.overrideWith((ref) async => calcularCargaDeuda(0, 0, umbral: 0)),
           perfilStreamProvider.overrideWith((ref) => Stream.value(null)),
           perfilRepositoryProvider.overrideWithValue(_PerfilRepositoryFake()),
+          // La pantalla de Asignación (AFCA) arma sus planes y bolsillos a
+          // partir de estos dos streams; sin el override van a la base y el
+          // test termina con timers pendientes.
+          planesAsignacionStreamProvider.overrideWith(
+            (ref) => Stream.value(const <PlanAsignacion>[]),
+          ),
+          detallesAsignacionStreamProvider.overrideWith(
+            (ref) => Stream.value(const <DetalleAsignacion>[]),
+          ),
           // El puente de registro rápido escucha las categorías del usuario
           // para armar los chips de la notificación, así que entra en el
           // grafo de la app igual que los streams de arriba.
@@ -153,7 +162,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('la barra lista los 12 módulos sin recortes', (tester) async {
+  testWidgets('la barra lista los 11 módulos sin recortes', (tester) async {
     await pumpApp(tester);
 
     for (final rama in _ramas) {
@@ -174,7 +183,7 @@ void main() {
   testWidgets('la barra se desliza y lleva el módulo activo a la vista', (
     tester,
   ) async {
-    // Superficie de teléfono: con el ancho por defecto de los tests (800) los 12
+    // Superficie de teléfono: con el ancho por defecto de los tests (800) los 11
     // módulos entrarían y no habría nada que deslizar.
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -191,12 +200,12 @@ void main() {
       reason: 'la barra tiene que ser un carrusel horizontal',
     );
 
-    // Los 12 módulos no entran: "Estadísticas" arranca fuera de la píldora.
+    // Los 11 módulos no entran: "Estadísticas" arranca fuera de la píldora.
     final barraRect = tester.getRect(barra);
     expect(
       tester.getRect(_etiqueta('Estadísticas')).left,
       greaterThan(barraRect.right),
-      reason: 'sin barra deslizable, los 12 módulos no entrarían',
+      reason: 'sin barra deslizable, los 11 módulos no entrarían',
     );
 
     final antes = tester.getTopLeft(_etiqueta('Estadísticas')).dx;
@@ -251,9 +260,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  // Un test por módulo. Antes iban todos en un solo `for`, y con que uno de los
-  // doce se quedara cargando, el `pumpAndSettle` lanzaba y los otros once
-  // aparecían como "no verificados" aunque estuvieran bien.
+  // Un test por módulo montable. Antes iban todos en un solo `for`, y con que
+  // uno se quedara cargando, el `pumpAndSettle` lanzaba y los demás aparecían
+  // como "no verificados" aunque estuvieran bien.
 for (final etiqueta in _montables) {
   final ruta = _ramas.firstWhere((r) => r.$1 == etiqueta).$2;
 
@@ -284,14 +293,14 @@ for (final etiqueta in _montables) {
 
 // El orden de la barra y el de las ramas tienen que ser el mismo número: si no,
 // tocar "Metas" lleva a Deudas y el `PageView` muestra la pantalla que no es.
-// Este test no monta widgets, así que cubre los 12 módulos, incluso los que no
+// Este test no monta widgets, así que cubre los 11 módulos, incluso los que no
 // se pueden levantar sin base de datos.
-test('las 12 ramas del shell coinciden con los 12 módulos de la barra', () {
+test('las 11 ramas del shell coinciden con los 11 módulos de la barra', () {
   final shell = buildRouter().configuration.routes
       .whereType<StatefulShellRoute>()
       .single;
 
-  expect(shell.branches.length, 12);
+  expect(shell.branches.length, 11);
 
   final rutasDeLasRamas = shell.branches
       .map((rama) => rama.routes.whereType<GoRoute>().first.path)

@@ -15,6 +15,13 @@ class Transaction {
   /// normales lo dejan en null.
   final int? prestamoId;
 
+  /// Bolsillo ([DetalleAsignacion]) al que se imputa este gasto, si alguno.
+  ///
+  /// Es el vínculo exacto que permite derivar cuánto se ha gastado en cada
+  /// categoría de un plan de asignación sin guardar contadores mutables. Una
+  /// transacción sin este id queda como "gasto no presupuestado".
+  final int? planDetalleId;
+
   final String? nota;
   final DateTime fechaCreacion;
 
@@ -42,6 +49,7 @@ class Transaction {
     required this.fecha,
     this.activoId,
     this.prestamoId,
+    this.planDetalleId,
     this.nota,
     required this.fechaCreacion,
     this.comprobantePath,
@@ -61,6 +69,7 @@ class Transaction {
       fecha TEXT NOT NULL,
       activo_id INTEGER,
       prestamo_id INTEGER,
+      plan_detalle_id INTEGER,
       nota TEXT,
       fecha_creacion TEXT NOT NULL,
       comprobante_path TEXT,
@@ -68,7 +77,8 @@ class Transaction {
       comprobante_mime_type TEXT,
       comprobante_size_bytes INTEGER,
       FOREIGN KEY (activo_id) REFERENCES activos(id) ON DELETE SET NULL,
-      FOREIGN KEY (prestamo_id) REFERENCES prestamos(id) ON DELETE CASCADE
+      FOREIGN KEY (prestamo_id) REFERENCES prestamos(id) ON DELETE CASCADE,
+      FOREIGN KEY (plan_detalle_id) REFERENCES detalles_asignacion(id) ON DELETE SET NULL
     )
   ''';
 
@@ -80,12 +90,14 @@ class Transaction {
     DateTime? fecha,
     int? activoId,
     int? prestamoId,
+    int? planDetalleId,
     String? nota,
     DateTime? fechaCreacion,
     String? comprobantePath,
     String? comprobanteNombre,
     String? comprobanteMimeType,
     int? comprobanteSizeBytes,
+    bool planDetalleIdCleared = false,
     bool comprobantePathCleared = false,
     bool comprobanteNombreCleared = false,
     bool comprobanteMimeTypeCleared = false,
@@ -99,6 +111,9 @@ class Transaction {
       fecha: fecha ?? this.fecha,
       activoId: activoId ?? this.activoId,
       prestamoId: prestamoId ?? this.prestamoId,
+      planDetalleId: planDetalleIdCleared
+          ? null
+          : (planDetalleId ?? this.planDetalleId),
       nota: nota ?? this.nota,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       comprobantePath: comprobantePathCleared
@@ -125,6 +140,7 @@ class Transaction {
       'fecha': DateFormat('yyyy-MM-dd').format(fecha),
       'activo_id': activoId,
       'prestamo_id': prestamoId,
+      'plan_detalle_id': planDetalleId,
       'nota': nota,
       'fecha_creacion': DateFormat('yyyy-MM-dd HH:mm:ss').format(fechaCreacion),
       'comprobante_path': comprobantePath,
@@ -143,6 +159,7 @@ class Transaction {
       fecha: DateFormat('yyyy-MM-dd').parse(map['fecha'] as String),
       activoId: map['activo_id'] as int?,
       prestamoId: map['prestamo_id'] as int?,
+      planDetalleId: map['plan_detalle_id'] as int?,
       nota: map['nota'] as String?,
       fechaCreacion: DateFormat('yyyy-MM-dd HH:mm:ss').parse(map['fecha_creacion'] as String),
       comprobantePath: map['comprobante_path'] as String?,

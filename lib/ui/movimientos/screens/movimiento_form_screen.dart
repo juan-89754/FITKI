@@ -12,9 +12,11 @@ import '../../../shared/mixins/guardando_mixin.dart';
 import '../../../data/models/transaction.dart';
 import '../../../data/models/asset.dart';
 import '../../../data/models/categoria_personalizada.dart';
+import '../../../logic/asignaciones/asignacion_logic.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../data/storage/comprobante_storage.dart';
+import '../../asignaciones/asignacion_providers.dart';
 
 class MovimientoFormScreen extends ConsumerStatefulWidget {
   final Transaction? movimiento;
@@ -44,6 +46,15 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
   int? _activoId;
   late DateTime _fecha;
 
+  /// Bolsillo del plan AFCA al que se imputa el gasto. Es lo que hace que el
+  /// plan y los movimientos no se desincronicen: sin este vínculo el "gastado"
+  /// de cada bolsillo se quedaría en cero para siempre.
+  int? _planDetalleId;
+
+  /// true cuando el usuario eligió el destino a mano; así un cambio posterior
+  /// de cuenta o categoría no lo reemplaza por la sugerencia automática.
+  bool _destinoElegidoAMano = false;
+
   final DateFormat _fechaFormat = DateFormat('dd MMM yyyy');
 
   bool get _isEditing => widget.movimiento != null;
@@ -59,6 +70,8 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
       _activoId = m.activoId;
       _fecha = m.fecha;
       _notaController.text = m.nota ?? '';
+      _planDetalleId = m.planDetalleId;
+      _destinoElegidoAMano = m.planDetalleId != null;
       _comprobantePathActual = m.comprobantePath;
       _comprobanteNombreActual = m.comprobanteNombre;
       _comprobanteMimeActual = m.comprobanteMimeType;
@@ -84,6 +97,76 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
     final categorias = categoriasDeTipo(_tipo, personalizadas);
     if (categorias.contains(_categoria)) return categorias;
     return [...categorias, _categoria];
+  }
+
+  /// Categoría real del movimiento: con "Otro" es el nombre escrito, resuelto
+  /// contra las existentes igual que al guardar.
+  String get _categoriaEfectiva {
+    if (_categoria != 'otro') return _categoria;
+    final nombre = _categoriaOtroController.text.trim();
+    if (nombre.isEmpty) return '';
+    final personalizadas = ref
+            .read(categoriasPersonalizadasStreamProvider)
+            .value ??
+        const <CategoriaPersonalizada>[];
+    return resolverCategoriaDeNombre(
+      nombre: nombre,
+      tipo: _tipo,
+      existentes: personalizadas,
+    );
+  }
+
+  List<ResumenDetalle> _bolsillosCandidatos() {
+    final resumenes = ref.read(resumenesPlanProvider);
+    return AsignacionLogic.bolsillosCandidatos(
+      categoria: _categoriaEfectiva,
+      activoId: _activoId,
+      resumenes: resumenes,
+    );
+  }
+
+  String _nombreDePlan(int? planId) {
+    for (final resumen in ref.read(resumenesPlanProvider)) {
+      if (resumen.plan.id == planId) return resumen.plan.nombre;
+    }
+    return 'Plan';
+  }
+
+  /// Mantiene el destino coherente con la cuenta y la categoría actuales.
+  ///
+  /// Si el vínculo actual ya no es un candidato (cambió la cuenta, la categoría
+  /// o el plan se archivó) se limpia, porque apuntaría a un bolsillo que ya no
+  /// corresponde. Solo se sugiere uno nuevo si el usuario no eligió a mano.
+  void _revalidarDestino() {
+    if (_tipo != 'gasto') {
+      if (_planDetalleId != null) setState(() => _planDetalleId = null);
+      return;
+    }
+
+    final candidatos = _bolsillosCandidatos();
+
+    if (_planDetalleId != null) {
+      final sigue = candidatos.any((c) => c.detalle.id == _planDetalleId);
+      if (sigue) return;
+      setState(() => _planDetalleId = null);
+      if (_destinoElegidoAMano) return;
+    }
+
+    if (_destinoElegidoAMano || _activoId == null) return;
+
+    final resumenes = ref.read(resumenesPlanProvider);
+    final sugerido = AsignacionLogic.resolverVinculoAutomatico(
+      categoria: _categoriaEfectiva,
+      activoId: _activoId,
+      planes: [for (final resumen in resumenes) resumen.plan],
+      detalles: [
+        for (final resumen in resumenes)
+          for (final detalle in resumen.detalles) detalle.detalle,
+      ],
+    );
+    if (sugerido != null && sugerido != _planDetalleId) {
+      setState(() => _planDetalleId = sugerido);
+    }
   }
 
   Future<void> _seleccionarFecha() async {
@@ -114,10 +197,11 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
     if (!_formKey.currentState!.validate()) return;
 
     // Todo movimiento va atado a una cuenta, sin importar su tipo: es lo que
-    // hace que el saldo del activo cuadre con su historial y que el
-    // presupuesto sume bien. Antes solo los gastos lo exigían, así que un
-    // ingreso se podía guardar con "Sin activo" y el dinero aparecía de la
-    // nada sin tocar ningún saldo, en silencio.
+    // hace que el saldo del activo cuadre con su historial y que los agregados
+    // por categoría (estadísticas y bolsillos de AFCA) sumen bien. Antes solo
+    // los gastos lo exigían, así que un ingreso se podía guardar con "Sin
+    // activo" y el dinero aparecía de la nada sin tocar ningún saldo, en
+    // silencio.
     final activos =
         ref.read(activosStreamProvider).asData?.value ?? const <Asset>[];
     final activoId = await resolverActivoDeGasto(
@@ -193,6 +277,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
       categoria: categoria,
       fecha: _fecha,
       activoId: _activoId,
+      planDetalleId: _tipo == 'gasto' ? _planDetalleId : null,
       nota: nota,
       fechaCreacion: widget.movimiento?.fechaCreacion ?? DateTime.now(),
       comprobantePath: comprobantePath,
@@ -287,7 +372,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
                 );
               }).toList(),
               onChanged: (value) {
-                if (value != null) setState(() => _categoria = value);
+                if (value != null) {
+                  setState(() => _categoria = value);
+                  _revalidarDestino();
+                }
               },
             ),
             const SizedBox(height: 16),
@@ -307,7 +395,10 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
                           ),
                         )),
                   ],
-                  onChanged: (value) => setState(() => _activoId = value),
+                  onChanged: (value) {
+                    setState(() => _activoId = value);
+                    _revalidarDestino();
+                  },
                 );
               },
               loading: () => const Center(
@@ -324,6 +415,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
               ),
             ),
             const SizedBox(height: 16),
+            _buildDestinoPlan(),
             InkWell(
               onTap: _seleccionarFecha,
               borderRadius: BorderRadius.circular(14),
@@ -357,6 +449,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
                       key: const ValueKey('campo-categoria-otro'),
                       controller: _categoriaOtroController,
                       textCapitalization: TextCapitalization.sentences,
+                      onChanged: (_) => _revalidarDestino(),
                       decoration: const InputDecoration(
                         labelText: 'Nombre de la categoría *',
                         hintText: 'Ej: Mascotas, Gimnasio, Becas',
@@ -425,6 +518,61 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
     );
   }
 
+  /// Destino del gasto dentro de un plan AFCA.
+  ///
+  /// Solo aparece para gastos y solo si hay bolsillos que puedan recibirlo: si
+  /// la cuenta y la categoría no tienen plan activo, no hay nada que elegir y
+  /// el campo se oculta en vez de quedar vacío. La sugerencia automática elige
+  /// sola cuando hay una coincidencia única; el usuario siempre puede cambiarla
+  /// o sacar el gasto del plan.
+  ///
+  /// La clave por vínculo obliga a reconstruir el campo cuando la sugerencia lo
+  /// mueve: `DropdownButtonFormField` conserva su estado interno y ignoraría un
+  /// `initialValue` posterior.
+  Widget _buildDestinoPlan() {
+    if (_tipo != 'gasto') return const SizedBox.shrink();
+
+    final candidatos = _bolsillosCandidatos();
+    if (candidatos.isEmpty && _planDetalleId == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<int?>(
+        key: ValueKey(_planDetalleId),
+        initialValue: _planDetalleId,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Destino del gasto',
+          helperText: 'Se descuenta del plan que elijas al guardarlo.',
+          helperMaxLines: 2,
+        ),
+        items: [
+          const DropdownMenuItem<int?>(
+            value: null,
+            child: Text('Sin asignar (fuera de plan)'),
+          ),
+          for (final detalle in candidatos)
+            DropdownMenuItem<int?>(
+              value: detalle.detalle.id,
+              child: Text(
+                '${_nombreDePlan(detalle.detalle.planId)} · '
+                '${AppFormat.moneda(detalle.restante)} libres',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _planDetalleId = value;
+            _destinoElegidoAMano = true;
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildSelectorTipo() {
     return SegmentedButton<String>(
       segments: [
@@ -473,6 +621,7 @@ class _MovimientoFormScreenState extends ConsumerState<MovimientoFormScreen>
           // con las personalizadas del tipo desde el stream provider.
           _categoria = _tipo == 'ingreso' ? 'salario' : 'alimentacion';
         });
+        _revalidarDestino();
       },
     );
   }

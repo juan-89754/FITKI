@@ -6,6 +6,7 @@ import '../../../shared/theme/app_colors.dart';
 import '../../../data/preferences/app_preferences.dart';
 import '../../../data/providers/shared_providers.dart';
 import '../../../logic/estadisticas/estadisticas_logic.dart';
+import '../../../logic/asignaciones/asignacion_logic.dart';
 import '../../../logic/carga_deuda.dart';
 import '../../../logic/categorias/categoria_labels.dart';
 import '../estadisticas_providers.dart';
@@ -78,6 +79,18 @@ class EstadisticasScreen extends ConsumerWidget {
                 '${EstadisticasLogic.mesesEvolucion} meses',
             icon: Icons.timeline_rounded,
             child: _LineEvolucion(puntos: datos.evolucionPatrimonio),
+          ),
+          const SizedBox(height: 16),
+          _CardGrafico(
+            titulo: 'Presupuestos (AFCA)',
+            icon: Icons.account_balance_wallet_outlined,
+            child: _AvancePlanes(datos: datos),
+          ),
+          const SizedBox(height: 16),
+          _CardGrafico(
+            titulo: 'Reparto por categoría (AFCA)',
+            icon: Icons.pie_chart_outline_rounded,
+            child: _RepartoAfca(reparto: datos.repartoAfca),
           ),
           const SizedBox(height: 16),
           _CardGrafico(
@@ -353,6 +366,193 @@ class _PieGastos extends StatelessWidget {
               ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+/// Avance de cada plan vigente: cuánto de lo repartido ya se gastó, y cuánto
+/// del gasto del mes quedó fuera de todo plan.
+class _AvancePlanes extends StatelessWidget {
+  final EstadisticasDatos datos;
+
+  const _AvancePlanes({required this.datos});
+
+  @override
+  Widget build(BuildContext context) {
+    if (datos.planesAfca.isEmpty) {
+      return const _SinDatos(
+        mensaje: 'Sin planes de asignación vigentes',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final resumen in datos.planesAfca)
+          _FilaAvancePlan(resumen: resumen),
+        const SizedBox(height: 2),
+        Text(
+          datos.gastoSinPresupuestarMes > 0
+              ? 'Fuera de todo plan este mes: '
+                  '${AppFormat.moneda(datos.gastoSinPresupuestarMes)}'
+              : 'Todos los gastos del mes entraron en algún plan.',
+          style: Theme.of(context).textTheme.bodySmall!.copyWith(
+            color: datos.gastoSinPresupuestarMes > 0
+                ? AppColors.coral
+                : AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilaAvancePlan extends StatelessWidget {
+  final ResumenPlan resumen;
+
+  const _FilaAvancePlan({required this.resumen});
+
+  @override
+  Widget build(BuildContext context) {
+    final porcentaje = resumen.porcentajeUsado;
+    final superado = porcentaje > 100;
+    final color = superado ? AppColors.coral : AppColors.primary;
+    final asignado = resumen.totalAsignado;
+    final categorias = resumen.detalles.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  resumen.plan.nombre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${porcentaje.toStringAsFixed(0)}%',
+                style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (porcentaje / 100).clamp(0.0, 1.0),
+              minHeight: 12,
+              color: color,
+              backgroundColor: AppColors.surfaceSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            asignado > 0
+                ? '${AppFormat.moneda(resumen.gastadoTotal)} de '
+                    '${AppFormat.moneda(asignado)} · $categorias '
+                    '${categorias == 1 ? 'categoría' : 'categorías'}'
+                : 'Sin categorías asignadas todavía',
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reparto del presupuesto por categoría, sumando los bolsillos de todos los
+/// planes vigentes.
+class _RepartoAfca extends StatelessWidget {
+  final List<RepartoCategoria> reparto;
+
+  const _RepartoAfca({required this.reparto});
+
+  @override
+  Widget build(BuildContext context) {
+    if (reparto.isEmpty) {
+      return const _SinDatos(
+        mensaje: 'Reparte un plan para ver su distribución',
+      );
+    }
+
+    final maxAsignado = reparto
+        .map((r) => r.asignado)
+        .reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in reparto)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      iconoCategoria(item.categoria),
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        labelCategoria(item.categoria),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppFormat.moneda(item.asignado),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: maxAsignado > 0
+                        ? (item.asignado / maxAsignado).clamp(0.0, 1.0)
+                        : 0,
+                    minHeight: 8,
+                    color: item.superado ? AppColors.coral : AppColors.primary,
+                    backgroundColor: AppColors.surfaceSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Gastado ${item.porcentajeUsado.toStringAsFixed(0)}% de lo '
+                  'asignado',
+                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

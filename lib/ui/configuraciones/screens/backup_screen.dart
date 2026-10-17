@@ -12,11 +12,11 @@ import '../../../logic/backup/reset_logic.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../asignaciones/asignacion_providers.dart';
 import '../../cotizaciones/cotizaciones_providers.dart';
 import '../../deudas/deudas_providers.dart';
 import '../../metas/metas_providers.dart';
 import '../../movimientos/movimientos_providers.dart';
-import '../../presupuesto/presupuesto_providers.dart';
 import '../../prestamos_inversiones/prestamos_inversiones_providers.dart';
 
 /// Backup y restauración manual de todos los datos de Fitki. El backup es el
@@ -58,13 +58,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     ref.invalidate(prestamosStreamProvider);
     ref.invalidate(inversionesStreamProvider);
     ref.invalidate(perfilStreamProvider);
-    // Los providers de Presupuesto y Gastos Fijos tienen su propia tabla y
-    // además generan los pagos del mes a partir de sus plantillas; tras
-    // restaurar o borrar hay que refrescarlos explícitamente.
-    ref.invalidate(presupuestosCategoriasStreamProvider);
-    ref.invalidate(gastosFijosStreamProvider);
-    ref.invalidate(pagosGastosFijosStreamProvider);
-    ref.invalidate(pagosDelMesProvider);
+    // Los providers de AFCA tienen su propia tabla; tras restaurar o borrar
+    // hay que refrescarlos explícitamente.
+    ref.invalidate(planesAsignacionStreamProvider);
+    ref.invalidate(detallesAsignacionStreamProvider);
   }
 
   Future<void> _generarBackup() async {
@@ -208,7 +205,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       title: '¿Borrar todos los datos?',
       message:
           'Se eliminarán permanentemente tus movimientos, cuentas, metas, '
-          'deudas, préstamos, cotizaciones, presupuestos y perfil. '
+          'deudas, préstamos, cotizaciones, planes de asignación y perfil. '
           'Esta acción no se puede deshacer.',
       confirmLabel: 'Continuar',
       destructive: true,
@@ -294,7 +291,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       message:
           'Se borraron todos tus registros financieros y tu perfil: '
           'activos, movimientos, deudas, metas, préstamos, cotizaciones y '
-          'presupuestos.\n\n'
+          'planes de asignación.\n\n'
           'Tus preferencias de apariencia y umbral de alerta siguen intactas.',
     );
   }

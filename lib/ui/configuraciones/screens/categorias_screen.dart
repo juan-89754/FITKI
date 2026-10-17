@@ -7,14 +7,15 @@ import '../../../logic/categorias/categoria_labels.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../presupuesto/presupuesto_providers.dart';
+import '../../asignaciones/asignacion_providers.dart';
 
 /// Gestión de categorías personalizadas de gasto/ingreso. Las categorías se
-/// guardan por NOMBRE (ese nombre queda como `categoria` en los movimientos y
-/// gastos fijos) y los íconos se eligen de una lista predefinida.
+/// guardan por NOMBRE (ese nombre queda como `categoria` en los movimientos y en
+/// los bolsillos de los planes AFCA) y los íconos se eligen de una lista
+/// predefinida.
 ///
 /// DECISIÓN sobre categorías borradas: al eliminar una categoría, los
-/// movimientos/gastos fijos que la usaban se reasignan a [categoriaEliminada].
+/// movimientos y bolsillos que la usaban se reasignan a [categoriaEliminada].
 /// El historial no se pierde ni se rompe: en las pantallas aparece como
 /// "Categoría eliminada" (ver labelCategoria) y el dropdown ya no la ofrece.
 class CategoriasScreen extends ConsumerStatefulWidget {
@@ -69,9 +70,9 @@ class _CategoriasScreenState extends ConsumerState<CategoriasScreen> {
       context: context,
       title: 'Eliminar categoría',
       message:
-          'Se eliminará "${categoria.nombre}". Los movimientos y presupuestos '
-          'que la usan se mantendrán y se mostrarán como "Categoría '
-          'eliminada".',
+          'Se eliminará "${categoria.nombre}". Los movimientos y los planes '
+          'de asignación que la usan se mantendrán y se mostrarán como '
+          '"Categoría eliminada".',
       confirmLabel: 'Eliminar',
       destructive: true,
     );
@@ -79,12 +80,12 @@ class _CategoriasScreenState extends ConsumerState<CategoriasScreen> {
 
     try {
       final movRepo = ref.read(movimientoRepositoryProvider);
-      final gastoFijoRepo = ref.read(gastoFijoRepositoryProvider);
+      final detalleRepo = ref.read(detalleAsignacionRepositoryProvider);
       final catRepo = ref.read(categoriaPersonalizadaRepositoryProvider);
       // Reasignar el historial antes de borrar la fila, para que nada quede
       // apuntando a una categoría inexistente.
       await movRepo.actualizarCategoria(categoria.nombre, categoriaEliminada);
-      await gastoFijoRepo.actualizarCategoria(
+      await detalleRepo.actualizarCategoria(
         categoria.nombre,
         categoriaEliminada,
       );

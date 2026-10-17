@@ -6,13 +6,10 @@ import 'package:fitki/data/models/asset.dart';
 import 'package:fitki/data/models/categoria_personalizada.dart';
 import 'package:fitki/data/models/debt.dart';
 import 'package:fitki/data/models/financial_goal.dart';
-import 'package:fitki/data/models/gasto_fijo.dart';
 import 'package:fitki/data/models/inversion_movimiento.dart';
 import 'package:fitki/data/models/investment.dart';
 import 'package:fitki/data/models/loan.dart';
-import 'package:fitki/data/models/pago_gasto_fijo.dart';
 import 'package:fitki/data/models/perfil.dart';
-import 'package:fitki/data/models/presupuesto_categoria.dart';
 import 'package:fitki/data/models/quote.dart';
 import 'package:fitki/data/models/quote_item.dart';
 import 'package:fitki/data/models/quote_project.dart';
@@ -21,15 +18,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Transaction;
 
-/// Migración v16 → v17 (y de paso hasta la v18): los movimientos guardados como
+/// Migración v16 → v17 (y de paso hasta la v20): los movimientos guardados como
 /// 'otro' + nota se convierten en categorías personalizadas reales.
 ///
 /// La prueba construye una base real en disco con el esquema de la v16, siembra
 /// movimientos 'otro' (con y sin nota) y luego la reabre con `DbHelper`, que
 /// ejecuta todas las migraciones pendientes. Protege que: se creen las
 /// categorías nuevas, se reutilicen las fijas y las existentes, no se dupliquen
-/// nombres dentro de la misma corrida, las filas sin nombre queden intactas y la
-/// v18 deje el presupuesto por categoría en su sitio.
+/// nombres dentro de la misma corrida, las filas sin nombre queden intactas, la
+/// v19 cree las tablas del módulo AFCA y la v20 no deje ninguna tabla de
+/// presupuesto. Las tablas de Gastos Fijos que tendría una base v16 no se siembran
+/// (sus modelos ya no existen); la v19 las descarta con `DROP TABLE IF EXISTS`
+/// igual, y el test comprueba que no queden en el esquema.
 void main() {
   late Directory dir;
   late String ruta;
@@ -83,8 +83,6 @@ void main() {
             QuoteProject.createTableSQL,
             Quote.createTableSQL,
             QuoteItem.createTableSQL,
-            GastoFijo.createTableSQL,
-            PagoGastoFijo.createTableSQL,
             presupuestosActivoSQL,
             CategoriaPersonalizada.createTableSQL,
             Perfil.createTableSQL,
@@ -162,7 +160,7 @@ void main() {
     final db = await helper.database; // ejecuta las migraciones pendientes
 
     final porNota = await categoriasPorNota(db);
-    expect(await db.getVersion(), 18);
+    expect(await db.getVersion(), 20);
     expect(porNota['Mascotas'], 'Mascotas');
     expect(porNota['mascotas'], 'Mascotas');
     expect(porNota['Transporte'], 'transporte');
@@ -206,19 +204,26 @@ void main() {
     expect(porNombreTipo['gasto|Gimnasio'], 'category_rounded');
     expect(porNombreTipo['ingreso|gimnasio'], 'category_rounded');
 
-    // La v18 reemplaza el presupuesto por activo por el de categoría: la tabla
-    // vieja desaparece y la nueva queda lista.
+    // La v18 reemplaza el presupuesto por activo, y la v20 borró el presupuesto
+    // por categoría junto con su módulo: ninguna tabla de presupuesto sobrevive
+    // a la migración hasta la versión actual.
     final tablas = await db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
     final nombres = tablas.map((f) => f['name'] as String).toSet();
-    expect(nombres, contains(PresupuestoCategoria.tableName));
     expect(nombres, isNot(contains('presupuestos_activo')));
+    expect(nombres, isNot(contains('presupuestos_categoria')));
+
+    // La v19 trae las tablas del módulo AFCA y deja fuera a Gastos Fijos.
+    expect(nombres, contains('planes_asignacion'));
+    expect(nombres, contains('detalles_asignacion'));
+    expect(nombres, isNot(contains('gastos_fijos')));
+    expect(nombres, isNot(contains('pagos_gastos_fijos')));
 
     // Reabrir tras cerrar no vuelve a migrar ni duplica nada.
     await helper.close();
     final db2 = await DbHelper().database;
-    expect(await db2.getVersion(), 18);
+    expect(await db2.getVersion(), 20);
     expect(await db2.query(CategoriaPersonalizada.tableName), hasLength(4));
   });
 }

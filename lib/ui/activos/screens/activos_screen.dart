@@ -11,6 +11,7 @@ import '../../../data/providers/shared_providers.dart';
 import '../activos_providers.dart';
 import '../../home/tab_navigation.dart';
 import '../../metas/metas_providers.dart';
+import '../../asignaciones/asignacion_providers.dart';
 import 'activo_form_screen.dart';
 
 class ActivosScreen extends ConsumerWidget {
@@ -248,7 +249,7 @@ class _PatrimonioHeader extends StatelessWidget {
   }
 }
 
-class _ActivoCard extends StatelessWidget {
+class _ActivoCard extends ConsumerWidget {
   final ActivoConSaldo activo;
   final IconData icono;
   final String labelTipo;
@@ -264,17 +265,29 @@ class _ActivoCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final asset = activo.activo;
+    final activoId = asset.id;
+
+    // Lo comprometido en planes AFCA. Es un desglose distinto del de metas:
+    // un plan no descuenta el saldo disponible (solo le da destino al dinero),
+    // así que no puede mezclarse con "reservado" sin mentirle al usuario.
+    final comprometido =
+        activoId == null ? 0.0 : ref.watch(saldosActivoProvider(activoId)).comprometido;
 
     // Solo tiene sentido desglosar cuando hay algo reservado: si no, mostrar
     // "disponible $X" repetido bajo un total de $X solo agrega ruido.
-    final hayReserva = activo.reservado > 0 || activo.reservadoInversiones > 0;
+    final hayReserva =
+        activo.reservado > 0 ||
+        activo.reservadoInversiones > 0 ||
+        comprometido > 0;
     final reservaTexto = [
       if (activo.reservado > 0)
         '${ActivosScreen._formatearMonto(activo.reservado, activo.moneda)} en metas',
       if (activo.reservadoInversiones > 0)
         '${ActivosScreen._formatearMonto(activo.reservadoInversiones, activo.moneda)} en inversiones',
+      if (comprometido > 0)
+        '${ActivosScreen._formatearMonto(comprometido, activo.moneda)} destinado en planes',
     ].join(' · ');
 
     return Card(

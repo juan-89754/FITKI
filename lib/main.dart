@@ -10,11 +10,10 @@ import 'shared/theme/theme_providers.dart';
 import 'shared/widgets/page_shell_container.dart';
 import 'ui/home/home_screen.dart';
 import 'ui/activos/screens/activos_screen.dart';
+import 'ui/asignaciones/asignacion_screen.dart';
 import 'ui/movimientos/screens/movimientos_screen.dart';
 import 'ui/metas/screens/metas_screen.dart';
 import 'ui/deudas/screens/deudas_screen.dart';
-import 'ui/presupuesto/screens/presupuesto_screen.dart';
-import 'ui/presupuesto/screens/gastos_fijos_screen.dart';
 import 'ui/cotizaciones/screens/proyectos_screen.dart';
 import 'ui/estadisticas/screens/estadisticas_screen.dart';
 import 'ui/prestamos_inversiones/screens/prestamos_inversiones_screen.dart';
@@ -26,7 +25,7 @@ import 'ui/configuraciones/screens/categorias_screen.dart';
 
 // Estructura de navegación de Fitki.
 //
-// El shell tiene 12 ramas: cada módulo de la app es una pestaña de la barra
+// El shell tiene 11 ramas: cada módulo de la app es una pestaña de la barra
 // inferior y se llega a todas deslizando o tocando. Antes solo cuatro eran
 // pestañas y las otras vivían en un menú lateral; ahora todas son ramas
 // del mismo [StatefulShellRoute] y el menú desapareció.
@@ -86,16 +85,8 @@ GoRouter buildRouter() => GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/presupuesto',
-              builder: (context, state) => const PresupuestoScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/gastos-fijos',
-              builder: (context, state) => const GastosFijosScreen(),
+              path: '/asignacion',
+              builder: (context, state) => const AsignacionScreen(),
             ),
           ],
         ),

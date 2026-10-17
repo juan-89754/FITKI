@@ -6,7 +6,6 @@ import 'package:fitki/data/models/asset.dart';
 import 'package:fitki/data/models/categoria_personalizada.dart';
 import 'package:fitki/data/providers/shared_providers.dart';
 import 'package:fitki/ui/movimientos/screens/movimiento_form_screen.dart';
-import 'package:fitki/ui/presupuesto/screens/gasto_fijo_form_screen.dart';
 
 /// "Otro" dejó de apretujarse en la nota: al elegirlo aparece un campo propio
 /// para nombrar la nueva categoría y la nota sigue siendo un campo aparte.
@@ -70,23 +69,6 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('Nota (opcional)'), findsOneWidget);
-    });
-  });
-
-  group('GastoFijoFormScreen', () {
-    testWidgets('al elegir Otro surge el campo de la nueva categoría',
-        (tester) async {
-      await pumpEn(tester, const GastoFijoFormScreen());
-
-      expect(find.byKey(const ValueKey('campo-categoria-otro')), findsNothing);
-
-      await elegirOtro(tester);
-
-      expect(
-        find.byKey(const ValueKey('campo-categoria-otro')),
-        findsOneWidget,
-      );
-      expect(find.text('Nombre de la categoría *'), findsOneWidget);
     });
   });
 }

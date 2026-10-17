@@ -40,7 +40,7 @@ class HomeShell extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  /// Los 12 módulos, en el mismo orden que las ramas del shell en `main.dart`.
+  /// Los 11 módulos, en el mismo orden que las ramas del shell en `main.dart`.
   ///
   /// "Préstamos" es la etiqueta corta de "Préstamos e inversiones": la barra
   /// reserva 96px por módulo y el nombre completo no entra sin recortarse a
@@ -49,8 +49,7 @@ class HomeShell extends ConsumerWidget {
     AppNavItem(icon: Icons.home_rounded, label: 'Inicio'),
     AppNavItem(icon: Icons.swap_horiz_rounded, label: 'Movimientos'),
     AppNavItem(icon: Icons.account_balance_rounded, label: 'Activos'),
-    AppNavItem(icon: Icons.donut_small_rounded, label: 'Presupuesto'),
-    AppNavItem(icon: Icons.autorenew_rounded, label: 'Gastos fijos'),
+    AppNavItem(icon: Icons.donut_small_rounded, label: 'Asignación'),
     AppNavItem(icon: Icons.credit_score_rounded, label: 'Deudas'),
     AppNavItem(icon: Icons.flag_rounded, label: 'Metas'),
     AppNavItem(icon: Icons.trending_up_rounded, label: 'Préstamos'),

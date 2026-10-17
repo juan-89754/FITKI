@@ -4,8 +4,8 @@ import '../../data/models/categoria_personalizada.dart';
 import '../../data/models/loan.dart';
 
 /// Categorías de GASTO predefinidas (slugs internos que se guardan en los
-/// movimientos y presupuestos). Fuente única de la lista fija que presentan
-/// los dropdowns de categoría de gasto.
+/// movimientos y en los bolsillos de los planes AFCA). Fuente única de la lista
+/// fija que presentan los dropdowns de categoría de gasto.
 const List<String> categoriasGasto = [
   'alimentacion',
   'transporte',
@@ -154,7 +154,7 @@ String labelFinalidad(String finalidad) {
 
 /// Categorías de un tipo listas para un dropdown: las predefinidas seguidas
 /// de las personalizadas del usuario (solo las de ese tipo, por su nombre,
-/// que es el valor que queda guardado en el movimiento/presupuesto).
+/// que es el valor que queda guardado en el movimiento).
 /// Si una personalizada repite el nombre de una fija (ignorando mayúsculas)
 /// se omite, para no romper la asociación nombre→slug.
 List<String> categoriasDeTipo(

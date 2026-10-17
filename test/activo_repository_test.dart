@@ -2,11 +2,10 @@ import 'package:fitki/data/db/db_helper.dart';
 import 'package:fitki/data/models/abono_meta.dart';
 import 'package:fitki/data/models/asset.dart';
 import 'package:fitki/data/models/financial_goal.dart';
-import 'package:fitki/data/models/gasto_fijo.dart';
 import 'package:fitki/data/models/inversion_movimiento.dart';
 import 'package:fitki/data/models/investment.dart';
 import 'package:fitki/data/models/loan.dart';
-import 'package:fitki/data/models/presupuesto_categoria.dart';
+import 'package:fitki/data/models/plan_asignacion.dart';
 import 'package:fitki/data/models/transaction.dart';
 import 'package:fitki/data/repositories/activo_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -61,26 +60,23 @@ void main() {
             ? FinancialGoal.tableName
             : (modelo is AbonoMeta)
                 ? AbonoMeta.tableName
-                : (modelo is GastoFijo)
-                    ? GastoFijo.tableName
+                : (modelo is PlanAsignacion)
+                    ? PlanAsignacion.tableName
                     : (modelo is Loan)
                         ? Loan.tableName
                         : (modelo is Investment)
                             ? Investment.tableName
                             : (modelo is InversionMovimiento)
                                 ? InversionMovimiento.tableName
-                                : (modelo is PresupuestoCategoria)
-                                    ? PresupuestoCategoria.tableName
-                                    : Transaction.tableName;
+                                : Transaction.tableName;
     final mapa = switch (modelo) {
       Asset() => modelo.toMap(),
       FinancialGoal() => modelo.toMap(),
       AbonoMeta() => modelo.toMap(),
-      GastoFijo() => modelo.toMap(),
+      PlanAsignacion() => modelo.toMap(),
       Loan() => modelo.toMap(),
       Investment() => modelo.toMap(),
       InversionMovimiento() => modelo.toMap(),
-      PresupuestoCategoria() => modelo.toMap(),
       Transaction() => modelo.toMap(),
       _ => throw ArgumentError('Modelo no soportado: $modelo'),
     };
@@ -112,12 +108,10 @@ void main() {
       activoId: activoId,
       fechaCreacion: DateTime(2026, 2, 1),
     ));
-    await dbInsert(GastoFijo(
-      nombre: 'Internet',
-      categoria: 'servicios',
-      montoEstimado: 50,
+    await dbInsert(PlanAsignacion(
       activoId: activoId,
-      fechaInicio: DateTime(2026, 1, 1),
+      nombre: 'Quincena',
+      montoTotalObjetivo: 500,
       fechaCreacion: DateTime(2026, 1, 1),
     ));
     await dbInsert(Loan(
@@ -143,13 +137,6 @@ void main() {
       activoId: activoId,
       fechaCreacion: DateTime(2026, 3, 15),
     ));
-    await dbInsert(PresupuestoCategoria(
-      categoria: 'alimentacion',
-      mes: 4,
-      anio: 2026,
-      montoLimite: 500,
-      fechaCreacion: DateTime(2026, 4, 1),
-    ));
     await dbInsert(Transaction(
       tipo: Transaction.tipoGasto,
       monto: 30,
@@ -162,19 +149,13 @@ void main() {
     await repo.delete(activoId);
 
     expect(await filas(Asset.tableName), isEmpty);
-    // El presupuesto es por categoría, no de la cuenta: borrar un activo no lo
-    // toca.
-    final presupuestos = await filas(PresupuestoCategoria.tableName);
-    expect(presupuestos, hasLength(1),
-        reason: 'el presupuesto por categoría no depende de la cuenta');
-    expect(presupuestos.single['categoria'], 'alimentacion');
 
     final abonos = await filas(AbonoMeta.tableName);
     expect(abonos, hasLength(1), reason: 'el abono conserva su historia');
     expect(abonos.single['activo_id'], isNull);
 
-    final gastos = await filas(GastoFijo.tableName);
-    expect(gastos.single['activo_id'], isNull);
+    final planes = await filas(PlanAsignacion.tableName);
+    expect(planes.single['activo_id'], isNull);
 
     final prestamos = await filas(Loan.tableName);
     expect(prestamos.single['activo_id'], isNull);

@@ -1,8 +1,8 @@
 # FITKI
 
-Fitki es una aplicación de finanzas personales que centraliza y organiza toda la información económica del usuario: activos, ingresos, gastos, deudas, préstamos, inversiones, presupuesto y metas de ahorro.
+Fitki es una aplicación de finanzas personales que centraliza y organiza toda la información económica del usuario: activos, ingresos, gastos, deudas, préstamos, inversiones, planes de asignación y metas de ahorro.
 
-Su objetivo es darle una visión clara de la situación financiera y ayudar a tomar decisiones informadas, combinando el registro de datos con cálculos automáticos, alertas y recomendaciones sobre el presupuesto, las deudas y el ahorro.
+Su objetivo es darle una visión clara de la situación financiera y ayudar a tomar decisiones informadas, combinando el registro de datos con cálculos automáticos, alertas y recomendaciones sobre la asignación del dinero, las deudas y el ahorro.
 
 ## Estado del proyecto
 
@@ -20,7 +20,7 @@ Módulos terminados y operativos:
 | Deudas | Completo |
 | Préstamos e inversiones | Completo |
 | Cotizaciones y proyectos | Completo |
-| Presupuesto y gastos fijos | Completo |
+| Asignación flexible (AFCA) | Completo |
 | Estadísticas | Completo |
 | Perfil, apariencia, categorías personalizadas y backup | Completo |
 | Asistente financiero con IA | No iniciado |
@@ -48,6 +48,17 @@ Módulo para llevar el control de los movimientos diarios de dinero.
 - Validaciones: el monto es obligatorio y mayor que cero; si la categoría es *Otro* se exige describir a qué corresponde el movimiento.
 - Al crear, editar o eliminar un movimiento, el saldo del activo asociado se actualiza de forma transaccional, de modo que los totales nunca quedan desincronizados.
 - Cálculos: totales por categoría, total de ingresos, total de gastos y balance.
+
+### Asignación de fondos (AFCA)
+
+Convierte el saldo de una cuenta en un reparto con destino: se define un plan con un monto a repartir y se divide entre categorías (los *bolsillos*).
+
+- Un plan pertenece a un activo y tiene un monto objetivo. Mientras quede dinero sin destinar, la pantalla del plan lo muestra peso a peso hasta que cierre.
+- Cada bolsillo es una categoría con su monto asignado. Al registrar un gasto, la app sugiere el bolsillo que corresponde por categoría y cuenta (y se puede elegir a mano); lo gastado no se guarda como contador, se deriva del historial, así el plan y la realidad nunca se desincronizan.
+- El detalle de un movimiento muestra a qué plan y categoría se imputó, o si quedó *sin asignar* (fuera de plan).
+- Tocar un bolsillo abre la lista de los gastos que se le imputaron, para poder auditar de dónde sale cada cifra.
+- Un plan puede ser *proyectado* (dinero que todavía no está en la cuenta): no descuenta del saldo ni recibe gastos hasta que se activen sus fondos. Un plan se archiva cuando termina y deja de contar como presupuesto vigente.
+- En Activos, cada cuenta muestra cuánto de su saldo ya está comprometido en planes con fondos, separado del saldo real, porque repartir no mueve el dinero: solo le pone destino.
 
 ### Creación de metas financieras
 
@@ -96,26 +107,14 @@ Permite planear compras o proyectos comparando opciones antes de decidir.
 - Cálculos: subtotal por ítem, total por cotización y **comparación de la cotización más económica** dentro del proyecto.
 - El enlace de compra se copia al portapapeles al tocarlo.
 
-### Presupuesto y gastos fijos
-
-Son dos módulos independientes: el presupuesto es un plan de gasto, los gastos fijos son compromisos que se repiten cada mes.
-
-**Presupuesto por categoría**
-- Cada presupuesto fija cuánto se está dispuesto a gastar en una categoría durante un mes concreto. No cuelga de una cuenta: el plan dice *en qué* se gasta, no *de qué tarjeta* sale el dinero.
-- El gasto se calcula siempre desde los movimientos reales de esa categoría (pagos de gastos fijos incluidos), así que el plan y la realidad nunca se desincronizan.
-- La pantalla muestra el total planeado frente al gastado, una barra por categoría y avisos cuando se supera el límite. Cada categoría admite un solo presupuesto por mes.
-- Al crear uno nuevo se sugiere un monto a partir del promedio gastado en esa categoría durante los últimos tres meses.
-
-**Gastos fijos**
-- Plantillas de lo que se paga todos los meses (internet, arriendo, servicios): nombre, categoría, monto estimado y fecha de inicio.
-- La app genera sola la lista de pagos que toca cada mes; al confirmar un pago se crea el movimiento real que alimenta el presupuesto de su categoría.
-
 ### Estadísticas y reportes
 
 Panel con gráficos (`fl_chart`) que se recalcula solo ante cualquier cambio en los datos:
 
 - **Resumen:** patrimonio total, balance del mes, promedio de avance de las metas, total de deudas pendientes y carga de deuda mensual frente al umbral configurado.
 - **Gastos por categoría:** gráfico circular del mes actual, ordenado de mayor a menor y con su porcentaje sobre el total gastado.
+- **Presupuestos (AFCA):** avance de cada plan vigente (gastado sobre lo asignado) y cuánto del gasto del mes quedó fuera de todo plan.
+- **Reparto por categoría (AFCA):** distribución del dinero asignado entre las categorías de todos los planes vigentes, ordenada de mayor a menor.
 - **Evolución del patrimonio:** gráfico de líneas de los últimos 6 meses.
 - **Deudas vs. ingresos del mes:** barras comparativas con el porcentaje que representan las deudas sobre los ingresos.
 
@@ -133,7 +132,7 @@ Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de 
 **Categorías personalizadas**
 - Se pueden crear categorías de gasto o ingreso con nombre e ícono.
 - No se permiten nombres duplicados, ni frente a las categorías predefinidas ni frente a las existentes.
-- Al eliminar una categoría, los movimientos y gastos fijos que la usaban se reasignan a *Categoría eliminada*, de modo que el historial se conserva.
+- Al eliminar una categoría, los movimientos y los bolsillos de los planes AFCA que la usaban se reasignan a *Categoría eliminada*, de modo que el historial se conserva.
 
 **Backup y restauración**
 - **Generar backup:** copia el archivo `.db` completo y lo comparte mediante el diálogo nativo del sistema, sin pedir permisos de almacenamiento. Se muestra la fecha del último backup.
@@ -145,7 +144,7 @@ Nombre y foto (cámara o galería). La foto se copia a un archivo permanente de 
 - **Flutter 3** / **Dart SDK >= 3.3.0**
 - **Riverpod** para el estado y la inyección de dependencias
 - **go_router** con `StatefulShellRoute` para la navegación
-- **sqflite** como base de datos local (16 tablas, versión de esquema 18)
+- **sqflite** como base de datos local (15 tablas, versión de esquema 20)
 - **fl_chart** para los gráficos
 - **shared_preferences** para preferencias no sensibles
 - **image_picker** + **path_provider** para la foto de perfil
@@ -170,7 +169,7 @@ lib/
 │   └── providers/             # Providers compartidos
 ├── logic/                     # Reglas de negocio puras (sin UI ni Riverpod)
 │   ├── activos/  movimientos/  metas/  deudas/
-│   ├── prestamos/  inversiones/  cotizaciones/  presupuesto/
+│   ├── prestamos/  inversiones/  cotizaciones/  asignaciones/
 │   ├── estadisticas/          # Agregados y series para los gráficos
 │   ├── backup/  categorias/
 ├── shared/                    # Tema, formato de números y widgets comunes
@@ -212,20 +211,21 @@ Plataformas con scaffolding en el repositorio: Android, iOS, Web, Windows, macOS
 
 ## Base de datos
 
-Archivo único `fitki.db` con 16 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `inversiones_movimientos`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `gastos_fijos`, `pagos_gastos_fijos`, `presupuestos_categoria`, `categorias_personalizadas` y `perfil`.
+Archivo único `fitki.db` con 15 tablas: `activos`, `movimientos`, `metas_financieras`, `abonos_metas`, `prestamos`, `inversiones`, `inversiones_movimientos`, `deudas`, `proyectos_cotizacion`, `cotizaciones`, `items_cotizacion`, `planes_asignacion`, `detalles_asignacion`, `categorias_personalizadas` y `perfil`.
 
-El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 18: los movimientos antiguos guardados como "Otro" con una nota se convierten en categorías personalizadas reales, y el presupuesto deja de ser un límite por cuenta para pasar a ser un límite por categoría), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
+El esquema se migra de forma incremental en `DbHelper._onUpgrade` (actualmente en la versión 20: la v17 convierte los movimientos antiguos guardados como "Otro" con una nota en categorías personalizadas reales, la v18 cambia el presupuesto de límite por cuenta a límite por categoría, la v19 estrena el módulo AFCA —planes de asignación y bolsillos por activo— y elimina las tablas de Gastos Fijos, y la v20 elimina el presupuesto mensual junto con su tabla, dejando a AFCA como el único control de asignación del dinero), de modo que las instalaciones existentes se actualizan sin perder datos. Un backup tomado antes de que existiera una tabla se sigue restaurando: la validación previa del archivo solo exige el núcleo del esquema y las tablas nuevas las crea la migración al reabrir la base.
 
 ## Pruebas
 
 Varios archivos en `test/`, todos con pruebas que corren sin emulador ni red; las que tocan persistencia usan SQLite con `sqflite_common_ffi` (en memoria o en un archivo temporal para probar migraciones de esquema):
 
 - `test/widget_test.dart`: prueba de humo que verifica que la app arranca y renderiza la pantalla de inicio, y que volver de segundo plano no monta la pantalla de desbloqueo.
-- `test/navigation_test.dart`: la barra de los doce módulos, el orden de las ramas del router y la apertura de cada sección de Configuración.
+- `test/navigation_test.dart`: la barra de los once módulos, el orden de las ramas del router y la apertura de cada sección de Configuración.
 - `test/acentos_test.dart`: contraste de los siete colores de marca y migración desde el acento rojo antiguo.
-- `test/gastos_logic_test.dart`: gastos fijos y presupuesto por categoría (comparación de límite contra lo gastado, gasto por categoría y sugerencia por promedio).
-- `test/migracion_otro_test.dart`: migración de esquema sobre una base real en disco; incluye que la v18 deje el presupuesto por categoría en su sitio.
-- `test/activo_repository_test.dart`: borrado de un activo sobre SQLite real, comprobando que el presupuesto por categoría no depende de la cuenta.
+- `test/gastos_logic_test.dart`: gasto agregado por categoría y sugerencia por promedio mensual.
+- `test/asignacion_logic_test.dart`: lógica pura de AFCA (saldo sin asignar y comprometido, gasto derivado por bolsillo, vínculo automático gasto↔bolsillo, candidatos de destino, movimientos de un bolsillo, gasto fuera de plan y reparto por categoría para las estadísticas).
+- `test/migracion_otro_test.dart`: migración de esquema sobre una base real en disco; incluye que la v19 cree las tablas de AFCA y que la v20 no deje ninguna tabla de presupuesto, sin rastro de Gastos Fijos.
+- `test/activo_repository_test.dart`: borrado de un activo sobre SQLite real, comprobando que cada hijo queda sin referencia a la cuenta muerta y que los movimientos nunca se tocan.
 - `test/saldos_metas_test.dart`: la regla de los dos saldos (Saldo Total frente a Saldo Disponible) y la aritmética de los abonos a metas.
 - `test/inversiones_repository_test.dart`: `InversionRepository` sobre una base SQLite en memoria (aportes, saldo reservado y resultado al finalizar).
 - `test/cotizaciones_item_test.dart`: regresión del guardado de items de cotización (la columna `tipo` de `items_cotizacion`).

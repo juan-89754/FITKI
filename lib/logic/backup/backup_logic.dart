@@ -55,10 +55,15 @@ const String _carpetaComprobantes = 'comprobantes';
 /// Un archivo solo se acepta como backup de Fitki si trae TODAS estas: son las
 /// que identifican el esquema y las que un backup antiguo también tiene.
 ///
-/// El presupuesto queda afuera a propósito: cambió de tabla entre versiones
-/// (`presupuestos_activo` hasta la v17, `presupuestos_categoria` desde la v18),
-/// así que no hay una que tengan TODOS los backups. La que corresponde al
-/// esquema actual se exige en [_tablasAgregadas], sobre la base ya migrada.
+/// El presupuesto mensual queda afuera a propósito: cambió de tabla entre
+/// versiones (`presupuestos_activo` hasta la v17, `presupuestos_categoria`
+/// desde la v18) y la v20 lo eliminó junto con su módulo, así que no hay una
+/// tabla que tengan TODOS los backups y una base nueva ni la crea. Los backups
+/// viejos sí la traen, pero como solo se exige el núcleo vigente siguen
+/// pasando la validación.
+///
+/// El módulo de Gastos Fijos (`gastos_fijos`, `pagos_gastos_fijos`) siguió la
+/// misma trayectoria en la v19.
 ///
 /// Las tablas de [_tablasAgregadas] NO se exigen en el archivo, porque un backup
 /// tomado antes de que existieran válidamente no las trae. Se crean solas al
@@ -75,8 +80,6 @@ const Set<String> _tablasNucleo = {
   'proyectos_cotizacion',
   'cotizaciones',
   'items_cotizacion',
-  'gastos_fijos',
-  'pagos_gastos_fijos',
   'categorias_personalizadas',
   'perfil',
 };
@@ -86,7 +89,8 @@ const Set<String> _tablasNucleo = {
 const Set<String> _tablasAgregadas = {
   'abonos_metas',
   'inversiones_movimientos',
-  'presupuestos_categoria',
+  'planes_asignacion',
+  'detalles_asignacion',
 };
 
 /// Todas las tablas que [DbHelper] crea al inicializar.

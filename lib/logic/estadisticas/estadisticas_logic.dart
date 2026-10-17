@@ -3,6 +3,7 @@ import '../../data/models/loan.dart';
 import '../../data/models/transaction.dart';
 import '../../data/models/financial_goal.dart';
 import '../../data/models/debt.dart';
+import '../asignaciones/asignacion_logic.dart';
 
 class GastoCategoria {
   final String categoria;
@@ -50,6 +51,17 @@ class EstadisticasDatos {
   /// de deuda", distinta del total pendiente).
   final double totalCuotasMensuales;
 
+  /// Planes de asignación vigentes (no archivados), con su gasto derivado. Es
+  /// el avance AFCA: cuánto de lo repartido ya se gastó en cada plan.
+  final List<ResumenPlan> planesAfca;
+
+  /// Reparto del dinero asignado por categoría, sumando los bolsillos de los
+  /// planes vigentes. Es la distribución AFCA.
+  final List<RepartoCategoria> repartoAfca;
+
+  /// Gastos del mes sin bolsillo asignado: cuánto se escapó del reparto.
+  final double gastoSinPresupuestarMes;
+
   const EstadisticasDatos({
     required this.patrimonioTotal,
     required this.balanceMes,
@@ -60,6 +72,9 @@ class EstadisticasDatos {
     required this.progresoMetas,
     required this.totalDeudasPendientes,
     required this.totalCuotasMensuales,
+    required this.planesAfca,
+    required this.repartoAfca,
+    required this.gastoSinPresupuestarMes,
   });
 }
 

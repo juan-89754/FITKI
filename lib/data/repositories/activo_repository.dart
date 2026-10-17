@@ -2,10 +2,10 @@ import 'package:sqflite/sqflite.dart' show DatabaseExecutor;
 
 import '../models/abono_meta.dart';
 import '../models/asset.dart';
-import '../models/gasto_fijo.dart';
 import '../models/inversion_movimiento.dart';
 import '../models/investment.dart';
 import '../models/loan.dart';
+import '../models/plan_asignacion.dart';
 import '../models/transaction.dart';
 import '../db/db_helper.dart';
 
@@ -13,14 +13,14 @@ class ActivoRepository {
   final DbHelper _dbHelper = DbHelper();
 
   /// ÚNICO lugar donde se toca `monto_disponible`. Todos los caminos que
-  /// mueven dinero (altas, bajas y pagos de gastos fijos) pasan por acá, así
+  /// mueven dinero (altas, bajas, pagos y transferencias) pasan por acá, así
   /// que la invariante "saldo = saldo inicial + suma de movimientos" no
   /// depende de que cada pantalla se acuerde de ajustar el saldo por su cuenta.
   ///
   /// El saldo puede quedar negativo a propósito: una cuenta puede gastarse más
   /// de lo que tiene (una tarjeta, un sobregiro). Floorearlo en cero hacía que
-  /// el saldo dejara de cuadrar con la suma de los movimientos, y como el
-  /// presupuesto se calcula sumando movimientos, los dos números que ve el
+  /// el saldo dejara de cuadrar con la suma de los movimientos, y como los
+  /// agregados se calculan sumando movimientos, los dos números que ve el
   /// usuario terminaban en contradicción.
   static Future<void> ajustarSaldoEnTransaccion(
     DatabaseExecutor txn, {
@@ -84,13 +84,11 @@ class ActivoRepository {
     );
   }
 
-  /// Elimina el activo. Los gastos fijos que lo respaldaban quedan sin activo
-  /// en vez de desaparecer: así el usuario puede reasignarlos a otra cuenta y
-  /// no pierde la plantilla ni su historial. Lo mismo con los préstamos a
-  /// terceros, las metas e inversiones, que quedan sin cuenta de origen pero
-  /// conservan todo su historial. Los movimientos no se tocan (son el historial
-  /// del dinero). El presupuesto ya no cuelga de la cuenta: es por categoría,
-  /// así que no hay nada que borrar aquí.
+  /// Elimina el activo. Los préstamos a terceros, las metas e inversiones
+  /// quedan sin cuenta de origen pero conservan todo su historial. Los planes de
+  /// asignación AFCA también quedan sin activo: el plan y sus bolsillos no se
+  /// pierden, el usuario puede reasignarlos a otra cuenta. Los movimientos no se
+  /// tocan (son el historial del dinero).
   ///
   /// Las claves foráneas no están habilitadas en la conexión, así que las
   /// cascadas declaradas en el esquema se aplican aquí a mano. La lista tiene
@@ -101,7 +99,7 @@ class ActivoRepository {
     final db = await _dbHelper.database;
     return db.transaction<int>((txn) async {
       await txn.update(
-        GastoFijo.tableName,
+        PlanAsignacion.tableName,
         {'activo_id': null},
         where: 'activo_id = ?',
         whereArgs: [id],
